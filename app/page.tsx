@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic';
+import fs from 'fs';
+import path from 'path';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
@@ -12,6 +14,11 @@ import {
 } from 'lucide-react';
 
 export default async function HomePage() {
+  const isInstalled = fs.existsSync(path.join(process.cwd(), 'installed.lock'));
+  if (!isInstalled) {
+    redirect('/install');
+  }
+
   const user = await getCurrentUser();
   if (user) {
     redirect('/dashboard');

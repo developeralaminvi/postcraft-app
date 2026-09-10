@@ -1,18 +1,18 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique
-  password       String
-  name           String?
+  id             String          @id @default(uuid()) @db.VarChar(36)
+  email          String          @unique @db.VarChar(191)
+  password       String          @db.VarChar(255)
+  name           String?         @db.VarChar(191)
   accounts       SocialAccount[]
   posts          Post[]
   createdAt      DateTime        @default(now())
@@ -20,15 +20,15 @@ model User {
 }
 
 model SocialAccount {
-  id             String          @id @default(uuid())
-  userId         String
+  id             String          @id @default(uuid()) @db.VarChar(36)
+  userId         String          @db.VarChar(36)
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  platform       String          @default("FACEBOOK")
-  accountId      String          // e.g. Facebook Page ID
-  name           String          // e.g. Facebook Page Name
-  avatar         String?
-  accessToken    String          // Page Access Token
-  category       String?
+  platform       String          @default("FACEBOOK") @db.VarChar(50)
+  accountId      String          @db.VarChar(191)
+  name           String          @db.VarChar(191)
+  avatar         String?         @db.Text
+  accessToken    String          @db.Text
+  category       String?         @db.VarChar(191)
   isActive       Boolean         @default(true)
   posts          Post[]
   createdAt      DateTime        @default(now())
@@ -38,23 +38,23 @@ model SocialAccount {
 }
 
 model Post {
-  id              String             @id @default(uuid())
-  userId          String
+  id              String             @id @default(uuid()) @db.VarChar(36)
+  userId          String             @db.VarChar(36)
   user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId       String
+  accountId       String             @db.VarChar(36)
   account         SocialAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  content         String
-  mediaUrl        String?
-  mediaType       String             @default("TEXT") // TEXT, IMAGE, VIDEO
+  content         String             @db.Text
+  mediaUrl        String?            @db.Text
+  mediaType       String             @default("TEXT") @db.VarChar(50)
   reactionsCount  Int                @default(0)
   commentsCount   Int                @default(0)
   lastPolledAt    DateTime?
   scheduledAt     DateTime?
   publishedAt     DateTime?
-  status          String             @default("DRAFT") // DRAFT, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
-  platformPostId  String?            // Facebook Post ID returned from Graph API
-  platformPostUrl String?            // Link to view post on Facebook
-  errorMessage    String?
+  status          String             @default("DRAFT") @db.VarChar(50)
+  platformPostId  String?            @db.VarChar(191)
+  platformPostUrl String?            @db.Text
+  errorMessage    String?            @db.Text
   comments        Comment[]
   milestones      MilestoneTrigger[]
   autoReply       AutoReplyRule?
@@ -63,41 +63,41 @@ model Post {
 }
 
 model Comment {
-  id                String          @id @default(uuid())
-  postId            String
+  id                String          @id @default(uuid()) @db.VarChar(36)
+  postId            String          @db.VarChar(36)
   post              Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
-  content           String
-  delayMinutes      Int             @default(0) // 0 = instant first comment
+  content           String          @db.Text
+  delayMinutes      Int             @default(0)
   scheduledAt       DateTime?
   publishedAt       DateTime?
-  status            String          @default("PENDING") // PENDING, PUBLISHED, FAILED
-  platformCommentId String?
-  errorMessage      String?
+  status            String          @default("PENDING") @db.VarChar(50)
+  platformCommentId String?         @db.VarChar(191)
+  errorMessage      String?         @db.Text
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
 
 model MilestoneTrigger {
-  id                String          @id @default(uuid())
-  postId            String
+  id                String          @id @default(uuid()) @db.VarChar(36)
+  postId            String          @db.VarChar(36)
   post              Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
-  type              String          // LIKES, COMMENTS
-  threshold         Int             // e.g. 10, 20
-  commentText       String
+  type              String          @db.VarChar(50)
+  threshold         Int
+  commentText       String          @db.Text
   isTriggered       Boolean         @default(false)
   triggeredAt       DateTime?
-  platformCommentId String?
+  platformCommentId String?         @db.VarChar(191)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 }
 
 model AutoReplyRule {
-  id                   String          @id @default(uuid())
-  postId               String          @unique
+  id                   String          @id @default(uuid()) @db.VarChar(36)
+  postId               String          @unique @db.VarChar(36)
   post                 Post            @relation(fields: [postId], references: [id], onDelete: Cascade)
   isEnabled            Boolean         @default(true)
-  replyText            String
-  lastRepliedCommentId String?
+  replyText            String          @db.Text
+  lastRepliedCommentId String?         @db.VarChar(191)
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 }
