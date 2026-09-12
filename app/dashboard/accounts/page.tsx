@@ -19,6 +19,8 @@ import {
   Hash,
   HelpCircle,
   Shield,
+  Globe,
+  User,
 } from 'lucide-react';
 
 interface Account {
@@ -37,14 +39,15 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [platform, setPlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN'>('FACEBOOK');
+  const [platform, setPlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS'>('FACEBOOK');
   const [pageId, setPageId] = useState('');
+  const [wpUsername, setWpUsername] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Guide Popup Modal state
   const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const [guidePlatform, setGuidePlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN'>('FACEBOOK');
+  const [guidePlatform, setGuidePlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS'>('FACEBOOK');
 
   const fetchAccounts = async () => {
     try {
@@ -65,7 +68,7 @@ export default function AccountsPage() {
     fetchAccounts();
   }, []);
 
-  const openGuide = (selectedPlatform?: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN') => {
+  const openGuide = (selectedPlatform?: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS') => {
     setGuidePlatform(selectedPlatform || platform);
     setIsGuideOpen(true);
   };
@@ -83,6 +86,7 @@ export default function AccountsPage() {
           platform,
           pageId: pageId.trim(),
           accessToken: accessToken.trim(),
+          username: wpUsername.trim(),
         }),
       });
 
@@ -95,6 +99,7 @@ export default function AccountsPage() {
 
       setMessage({ type: 'success', text: data.message });
       setPageId('');
+      setWpUsername('');
       setAccessToken('');
       fetchAccounts();
     } catch (err: any) {
@@ -119,7 +124,11 @@ export default function AccountsPage() {
 
   const fillSimulatedDemo = () => {
     const randomId = Math.floor(1000 + Math.random() * 9000);
-    if (platform === 'LINKEDIN') {
+    if (platform === 'WORDPRESS') {
+      setPageId('https://techcraft.example.com');
+      setWpUsername('demouser');
+      setAccessToken('TEST_WP_APP_PASSWORD_12345');
+    } else if (platform === 'LINKEDIN') {
       setPageId(`urn:li:person:TEST_LI_${randomId}`);
       setAccessToken('TEST_LINKEDIN_TOKEN_SIMULATED');
     } else if (platform === 'INSTAGRAM') {
@@ -214,13 +223,24 @@ export default function AccountsPage() {
               >
                 <Linkedin className="w-3.5 h-3.5" /> LinkedIn
               </button>
+              <button
+                type="button"
+                onClick={() => setPlatform('WORDPRESS')}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
+                  platform === 'WORDPRESS'
+                    ? 'bg-[#21759B] text-white shadow-xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" /> WordPress
+              </button>
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-1">
             <h2 className="font-bold text-sm text-slate-900 flex items-center gap-2">
               <Plus className="w-4 h-4 text-indigo-600" />
-              Connect {platform === 'LINKEDIN' ? 'LinkedIn' : platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
+              Connect {platform === 'WORDPRESS' ? 'WordPress Site' : platform === 'LINKEDIN' ? 'LinkedIn' : platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
             </h2>
             <button
               type="button"
@@ -232,11 +252,13 @@ export default function AccountsPage() {
           </div>
 
           <form onSubmit={handleConnect} className="space-y-4">
-            {/* Account / Page ID */}
+            {/* Account / Page ID / Site URL */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <Hash className="w-3 h-3 text-slate-400" />
-                {platform === 'LINKEDIN'
+                {platform === 'WORDPRESS'
+                  ? 'WordPress Site URL'
+                  : platform === 'LINKEDIN'
                   ? 'LinkedIn Member URN বা Org ID'
                   : platform === 'INSTAGRAM'
                   ? 'Instagram Business বা Creator ID'
@@ -248,7 +270,9 @@ export default function AccountsPage() {
                 value={pageId}
                 onChange={(e) => setPageId(e.target.value)}
                 placeholder={
-                  platform === 'LINKEDIN'
+                  platform === 'WORDPRESS'
+                    ? 'https://yourwebsite.com'
+                    : platform === 'LINKEDIN'
                     ? 'urn:li:person:... অথবা urn:li:organization:... (বা me)'
                     : platform === 'INSTAGRAM'
                     ? 'e.g. 17841405309214589'
@@ -257,7 +281,9 @@ export default function AccountsPage() {
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition font-mono text-xs text-slate-900 bg-white"
               />
               <p className="text-[11px] text-slate-400 mt-1">
-                {platform === 'LINKEDIN'
+                {platform === 'WORDPRESS'
+                  ? 'আপনার ওয়ার্ডপ্রেস ওয়েবসাইটের পূর্ণ লিংক দিন (যেমন: https://yourwebsite.com)'
+                  : platform === 'LINKEDIN'
                   ? 'কোম্পানি পেজ কানেক্ট করতে পেজের আইডি সংখ্যা (যেমন: 12345678) অথবা লিঙ্ক দিন। ব্যক্তিগত প্রোফাইলের জন্য me লিখুন।'
                   : platform === 'INSTAGRAM'
                   ? 'আপনার Instagram Business বা Creator অ্যাকাউন্টের আইডি'
@@ -265,19 +291,39 @@ export default function AccountsPage() {
               </p>
             </div>
 
-            {/* Access Token */}
+            {/* WordPress Username Field */}
+            {platform === 'WORDPRESS' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                  <User className="w-3 h-3 text-slate-400" />
+                  WordPress Username
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={wpUsername}
+                  onChange={(e) => setWpUsername(e.target.value)}
+                  placeholder="admin বা আপনার ওয়ার্ডপ্রেস ইউজারনেম"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#21759B] focus:border-[#21759B] transition font-mono text-xs text-slate-900 bg-white"
+                />
+              </div>
+            )}
+
+            {/* Access Token / Application Password */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <Key className="w-3 h-3 text-slate-400" />
-                Access Token
+                {platform === 'WORDPRESS' ? 'Application Password' : 'Access Token'}
               </label>
               <textarea
                 required
-                rows={3}
+                rows={platform === 'WORDPRESS' ? 2 : 3}
                 value={accessToken}
                 onChange={(e) => setAccessToken(e.target.value)}
                 placeholder={
-                  platform === 'LINKEDIN'
+                  platform === 'WORDPRESS'
+                    ? 'xxxx xxxx xxxx xxxx (Application Password)'
+                    : platform === 'LINKEDIN'
                     ? 'AQ... (LinkedIn OAuth 2.0 Access Token)'
                     : platform === 'INSTAGRAM'
                     ? 'EAAG... (Meta Graph API Access Token)'
@@ -285,13 +331,20 @@ export default function AccountsPage() {
                 }
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition font-mono text-xs text-slate-900 bg-white leading-relaxed"
               />
+              {platform === 'WORDPRESS' && (
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Users &gt; Profile &gt; Application Passwords থেকে তৈরি করা পাসওয়ার্ডটি এখানে পেস্ট করুন।
+                </p>
+              )}
             </div>
 
             <button
               type="submit"
               disabled={submitting}
               className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white text-sm font-semibold shadow-sm transition disabled:opacity-50 cursor-pointer ${
-                platform === 'LINKEDIN'
+                platform === 'WORDPRESS'
+                  ? 'bg-[#21759B] hover:bg-[#1a5d7c]'
+                  : platform === 'LINKEDIN'
                   ? 'bg-[#0A66C2] hover:bg-[#004182]'
                   : platform === 'INSTAGRAM'
                   ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-95'
@@ -304,7 +357,7 @@ export default function AccountsPage() {
                 </>
               ) : (
                 <>
-                  Connect {platform} Account
+                  Connect {platform === 'WORDPRESS' ? 'WordPress Site' : platform}
                 </>
               )}
             </button>
@@ -466,6 +519,17 @@ export default function AccountsPage() {
               >
                 <Linkedin className="w-3.5 h-3.5" /> LinkedIn গাইড
               </button>
+              <button
+                type="button"
+                onClick={() => setGuidePlatform('WORDPRESS')}
+                className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
+                  guidePlatform === 'WORDPRESS'
+                    ? 'border-[#21759B] text-[#21759B]'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" /> WordPress গাইড
+              </button>
             </div>
 
             {/* Modal Scrollable Content */}
@@ -589,6 +653,35 @@ export default function AccountsPage() {
                       <li>এখানে <code className="px-1 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">/company/</code> এর ঠিক পরের <strong>সংখ্যাটি (যেমন: 12345678)</strong> হলো আপনার পেজ আইডি!</li>
                       <li>আপনি সরাসরি এই সংখ্যাটি অথবা পুরো পেজের লিঙ্কটি আমাদের আইডি ঘরে পেস্ট করতে পারেন (সিস্টেম অটোমেটিক আইডি চিনে নিবে)।</li>
                       <li>টোকেন নেওয়ার সময় <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_organization_social</code> পারমিশন সিলেক্ট করে টোকেন নিন।</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+              {guidePlatform === 'WORDPRESS' && (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-2xl bg-[#21759B]/10 border border-[#21759B]/20 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-[#1a5d7c] text-sm">ওয়ার্ডপ্রেস Application Passwords ফিচার</p>
+                      <p className="text-[#21759B] text-xs mt-0.5">
+                        ওয়ার্ডপ্রেস ৫.৬+ এর সব ভার্সনে কোনো বাড়তি প্লাগইন ছাড়াই সিকিউর অ্যাপ্লিকেশন পাসওয়ার্ড তৈরি করা যায়।
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#21759B]"></span>
+                      ধাপে ধাপে ওয়ার্ডপ্রেস কানেক্ট করার নিয়ম:
+                    </p>
+                    <ol className="list-decimal pl-5 space-y-2 text-slate-600 text-xs">
+                      <li>আপনার ওয়ার্ডপ্রেস অ্যাডমিন ড্যাশবোর্ডে লগইন করুন (যেমন: <code className="px-1 py-0.5 bg-slate-100 rounded">https://yourwebsite.com/wp-admin</code>)।</li>
+                      <li>বামপাশের ড্যাশবোর্ড মেনু থেকে <strong>Users (ব্যবহারকারী) &gt; Profile (প্রোফাইল)</strong> এ যান।</li>
+                      <li>পেজের একদম নিচে স্ক্রোল করে <strong>Application Passwords</strong> সেকশনে আসুন।</li>
+                      <li><strong>New Application Password Name</strong> ঘরে লিখুন: <code className="px-1.5 py-0.5 bg-cyan-50 text-[#21759B] font-bold rounded">PostCraft</code>।</li>
+                      <li><strong>Add New Application Password</strong> বাটনে ক্লিক করুন।</li>
+                      <li>স্ক্রিনে যে ২৪ অক্ষরের পাসওয়ার্ডটি আসবে (যেমন: <code className="px-1 py-0.5 bg-slate-100 font-mono">abcd efgh ijkl mnop</code>) সেটি কপি করুন।</li>
+                      <li>পোস্টক্রাফটে এসে আপনার <strong>Site URL</strong>, <strong>Username</strong>, এবং এই <strong>Application Password</strong> দিয়ে Connect বাটনে ক্লিক করুন!</li>
                     </ol>
                   </div>
                 </div>

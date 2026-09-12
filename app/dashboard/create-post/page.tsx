@@ -38,6 +38,10 @@ import {
   Check,
   Layers,
   Edit3,
+  Tag,
+  FileText,
+  Eye,
+  FileCode,
 } from 'lucide-react';
 
 interface Account {
@@ -45,6 +49,7 @@ interface Account {
   name: string;
   avatar?: string | null;
   accountId: string;
+  pageId?: string;
   platform: string;
   category?: string;
 }
@@ -58,7 +63,12 @@ interface MilestoneInput {
 
 interface ChannelCustomization {
   isCustomized: boolean;
+  title?: string;
   content: string;
+  categories?: number[];
+  tags?: string;
+  excerpt?: string;
+  wpStatus?: 'publish' | 'future' | 'draft' | 'pending';
   mediaUrl: string;
   mediaType: 'TEXT' | 'IMAGE' | 'VIDEO';
   enableFirstComment: boolean;
@@ -76,12 +86,30 @@ export default function CreatePostPage() {
   const [activeTab, setActiveTab] = useState<'MASTER' | string>('MASTER');
 
   // Master Post States
+  const [masterTitle, setMasterTitle] = useState('');
   const [masterContent, setMasterContent] = useState('');
+  const [masterCategories, setMasterCategories] = useState<number[]>([1]);
+  const [masterTags, setMasterTags] = useState('');
+  const [masterExcerpt, setMasterExcerpt] = useState('');
+  const [masterWpStatus, setMasterWpStatus] = useState<'publish' | 'future' | 'draft' | 'pending'>('publish');
   const [masterMediaUrl, setMasterMediaUrl] = useState('');
   const [masterMediaType, setMasterMediaType] = useState<'TEXT' | 'IMAGE' | 'VIDEO'>('TEXT');
   const [masterEnableFirstComment, setMasterEnableFirstComment] = useState(true);
   const [masterFirstCommentContent, setMasterFirstCommentContent] = useState('');
   const [masterFirstCommentDelay, setMasterFirstCommentDelay] = useState<number>(0);
+
+  // WordPress Specific Categories & Inline Editor States
+  const [wpCategories, setWpCategories] = useState<Array<{ id: number; name: string; slug: string; count?: number }>>([
+    { id: 1, name: 'Technology', slug: 'tech', count: 28 },
+    { id: 2, name: 'Web Development', slug: 'web-dev', count: 34 },
+    { id: 3, name: 'AI & Automation', slug: 'ai-automation', count: 42 },
+    { id: 4, name: 'Digital Marketing', slug: 'digital-marketing', count: 19 },
+  ]);
+  const [loadingWpCategories, setLoadingWpCategories] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [editorMode, setEditorMode] = useState<'code' | 'visual'>('code');
+  const inlineImageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingInline, setUploadingInline] = useState(false);
 
   // Per-channel Customizations
   const [customizations, setCustomizations] = useState<Record<string, ChannelCustomization>>({});
@@ -379,6 +407,10 @@ export default function CreatePostPage() {
   const isMaster = activeTab === 'MASTER';
   const activeAccount = accounts.find((a) => a.id === activeTab) || null;
 
+  const isWordPressActive = isMaster
+    ? accounts.some((a) => selectedAccountIds.includes(a.id) && a.platform === 'WORDPRESS')
+    : activeAccount?.platform === 'WORDPRESS';
+
   const getEffectiveChannelData = (accId: string): ChannelCustomization => {
     const custom = customizations[accId];
     if (custom && custom.isCustomized) {
@@ -386,7 +418,12 @@ export default function CreatePostPage() {
     }
     return {
       isCustomized: false,
+      title: masterTitle,
       content: masterContent,
+      categories: masterCategories,
+      tags: masterTags,
+      excerpt: masterExcerpt,
+      wpStatus: masterWpStatus,
       mediaUrl: masterMediaUrl,
       mediaType: masterMediaType,
       enableFirstComment: masterEnableFirstComment,
@@ -396,9 +433,39 @@ export default function CreatePostPage() {
   };
 
   // Current values based on active tab
+  const currentTitle = isMaster
+    ? masterTitle
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].title !== undefined
+        ? customizations[activeTab].title || ''
+        : masterTitle);
+
   const currentContent = isMaster
     ? masterContent
     : (customizations[activeTab]?.isCustomized ? customizations[activeTab].content : masterContent);
+
+  const currentCategories = isMaster
+    ? masterCategories
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].categories !== undefined
+        ? customizations[activeTab].categories || []
+        : masterCategories);
+
+  const currentTags = isMaster
+    ? masterTags
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].tags !== undefined
+        ? customizations[activeTab].tags || ''
+        : masterTags);
+
+  const currentExcerpt = isMaster
+    ? masterExcerpt
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].excerpt !== undefined
+        ? customizations[activeTab].excerpt || ''
+        : masterExcerpt);
+
+  const currentWpStatus = isMaster
+    ? masterWpStatus
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].wpStatus !== undefined
+        ? customizations[activeTab].wpStatus || 'publish'
+        : masterWpStatus);
 
   const currentMediaUrl = isMaster
     ? masterMediaUrl
@@ -421,6 +488,141 @@ export default function CreatePostPage() {
     : (customizations[activeTab]?.isCustomized ? customizations[activeTab].firstCommentDelay : masterFirstCommentDelay);
 
   // Updaters for active content
+  const updateActiveTitle = (val: string) => {
+    if (isMaster) {
+      setMasterTitle(val);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            title: val,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveCategories = (cats: number[]) => {
+    if (isMaster) {
+      setMasterCategories(cats);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            categories: cats,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveTags = (val: string) => {
+    if (isMaster) {
+      setMasterTags(val);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            tags: val,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveExcerpt = (val: string) => {
+    if (isMaster) {
+      setMasterExcerpt(val);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            excerpt: val,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveWpStatus = (status: 'publish' | 'future' | 'draft' | 'pending') => {
+    if (isMaster) {
+      setMasterWpStatus(status);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            wpStatus: status,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const insertHtmlTag = (openTag: string, closeTag: string, defaultText = '') => {
+    const textarea = contentRef.current;
+    const start = textarea ? textarea.selectionStart || 0 : currentContent.length;
+    const end = textarea ? textarea.selectionEnd || 0 : currentContent.length;
+    const selectedText = currentContent.substring(start, end) || defaultText;
+    const replacement = `${openTag}${selectedText}${closeTag}`;
+    const newText = currentContent.substring(0, start) + replacement + currentContent.substring(end);
+    updateActiveContent(newText);
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(start + openTag.length, start + openTag.length + selectedText.length);
+      }
+    }, 50);
+  };
+
+  const handleInlineImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingInline(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        const textarea = contentRef.current;
+        const cursor = textarea ? textarea.selectionStart || currentContent.length : currentContent.length;
+        const imgTag = `\n<img src="${data.url}" alt="${file.name.replace(/\.[^/.]+$/, '')}" class="rounded-xl my-4 max-w-full h-auto shadow-md" />\n`;
+        const newText = currentContent.substring(0, cursor) + imgTag + currentContent.substring(cursor);
+        updateActiveContent(newText);
+      } else {
+        alert(data.error || 'Failed to upload inline image');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error uploading inline image');
+    } finally {
+      setUploadingInline(false);
+      if (inlineImageInputRef.current) inlineImageInputRef.current.value = '';
+    }
+  };
+
   const updateActiveContent = (val: string) => {
     if (isMaster) {
       setMasterContent(val);
@@ -523,7 +725,12 @@ export default function CreatePostPage() {
       ...prev,
       [accId]: {
         isCustomized: false,
+        title: masterTitle,
         content: masterContent,
+        categories: masterCategories,
+        tags: masterTags,
+        excerpt: masterExcerpt,
+        wpStatus: masterWpStatus,
         mediaUrl: masterMediaUrl,
         mediaType: masterMediaType,
         enableFirstComment: masterEnableFirstComment,
@@ -924,6 +1131,28 @@ export default function CreatePostPage() {
     }
   }, [searchParams]);
 
+  // Load WordPress categories when WordPress accounts are selected
+  useEffect(() => {
+    const wpAcc = accounts.find(
+      (a) => (isMaster ? selectedAccountIds.includes(a.id) : a.id === activeTab) && a.platform === 'WORDPRESS'
+    );
+    if (wpAcc) {
+      setLoadingWpCategories(true);
+      fetch(`/api/wordpress/categories?accountId=${wpAcc.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.categories && data.categories.length > 0) {
+            setWpCategories(data.categories);
+            if (masterCategories.length === 0) {
+              setMasterCategories([data.categories[0].id]);
+            }
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoadingWpCategories(false));
+    }
+  }, [accounts, selectedAccountIds, activeTab, isMaster]);
+
   // Direct File Upload Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1010,7 +1239,7 @@ export default function CreatePostPage() {
       return;
     }
 
-    // Check Instagram media requirements across selected accounts
+    // Check Instagram & WordPress requirements across selected accounts
     for (const accId of selectedAccountIds) {
       const acc = accounts.find((a) => a.id === accId);
       if (acc?.platform === 'INSTAGRAM') {
@@ -1019,6 +1248,13 @@ export default function CreatePostPage() {
           setError(
             `Instagram account "${acc.name}" requires an image or video attachment. Please attach media either in the Master tab or directly on the Instagram tab.`
           );
+          return;
+        }
+      }
+      if (acc?.platform === 'WORDPRESS') {
+        const eff = getEffectiveChannelData(accId);
+        if (!eff.title || !eff.title.trim()) {
+          setError(`WordPress post for "${acc.name}" requires an Article Title.`);
           return;
         }
       }
@@ -1039,7 +1275,12 @@ export default function CreatePostPage() {
         if (c && c.isCustomized) {
           customPayload[accId] = {
             isCustomized: true,
+            title: c.title?.trim() || undefined,
             content: c.content.trim(),
+            categories: c.categories,
+            tags: c.tags,
+            excerpt: c.excerpt?.trim() || undefined,
+            wpStatus: c.wpStatus,
             mediaUrl: c.mediaUrl.trim() || undefined,
             mediaType: c.mediaType,
             autoComment: c.enableFirstComment && c.firstCommentContent.trim()
@@ -1059,6 +1300,11 @@ export default function CreatePostPage() {
         body: JSON.stringify({
           accountIds: selectedAccountIds,
           content: masterContent,
+          title: masterTitle.trim() || undefined,
+          categories: masterCategories,
+          tags: masterTags,
+          excerpt: masterExcerpt.trim() || undefined,
+          wpStatus: masterWpStatus,
           mediaUrl: masterMediaUrl.trim() || undefined,
           mediaType: masterMediaType,
           publishNow: publishMode === 'now',
@@ -1114,6 +1360,7 @@ export default function CreatePostPage() {
 
   const previewData = previewAccount ? getEffectiveChannelData(previewAccount.id) : null;
   const previewPlatform = previewAccount?.platform || 'FACEBOOK';
+  const isPreviewWordPress = previewPlatform === 'WORDPRESS';
   const isPreviewLinkedIn = previewPlatform === 'LINKEDIN';
   const isPreviewInstagram = previewPlatform === 'INSTAGRAM';
 
@@ -1323,65 +1570,246 @@ export default function CreatePostPage() {
 
           {/* Composer Main Box */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-            {/* Post Caption */}
+            {/* WordPress Article Title Input */}
+            {isWordPressActive && (
+              <div className="space-y-1.5 p-4 rounded-xl bg-blue-50/70 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-[#21759B] uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-[#21759B]" /> WordPress Article Title <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-[#21759B] font-semibold">H1 Heading</span>
+                </div>
+                <input
+                  type="text"
+                  value={currentTitle}
+                  onChange={(e) => updateActiveTitle(e.target.value)}
+                  placeholder="e.g. 10 Essential Web Design Trends for 2026..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-blue-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#21759B]"
+                />
+              </div>
+            )}
+
+            {/* Post Caption / Article Body */}
             <div className="relative">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  {isMaster ? 'Master Post Caption' : `${activeAccount?.name} Caption`}
+                  {isWordPressActive
+                    ? isMaster
+                      ? 'Master Content / Article Body'
+                      : `${activeAccount?.name} Article Body`
+                    : isMaster
+                    ? 'Master Post Caption'
+                    : `${activeAccount?.name} Caption`}
                 </label>
                 <span className="text-xs text-slate-400">{currentContent.length} characters</span>
               </div>
 
-              {/* Quick Mention Toolbar */}
-              <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-                  <AtSign className="w-3 h-3 text-indigo-500" /> Mention:
-                </span>
-                {AUDIENCE_TAGS.map((t) => (
-                  <button
-                    key={t.tag}
-                    type="button"
-                    onClick={() => quickInsertMentionToField('content', t.tag)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition border border-slate-200"
-                  >
-                    {t.tag}
-                  </button>
-                ))}
-              </div>
+              {/* WordPress HTML Formatting Toolbar & Inline Image Uploader */}
+              {isWordPressActive ? (
+                <div className="mb-2 p-2 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {/* HTML Quick Formatting Tags */}
+                    <div className="flex flex-wrap items-center gap-1 text-xs">
+                      <span className="text-[11px] font-bold text-slate-500 px-1">HTML:</span>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<h2>', '</h2>', 'Section Heading')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Heading 2 (<h2>)"
+                      >
+                        H2
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<h3>', '</h3>', 'Sub-heading')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Heading 3 (<h3>)"
+                      >
+                        H3
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<strong>', '</strong>', 'Bold text')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Bold (<strong>)"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<em>', '</em>', 'Italic text')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 italic border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Italic (<em>)"
+                      >
+                        I
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2">', '</blockquote>', 'Quote text')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Blockquote"
+                      >
+                        Quote
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<ul>\n  <li>', '</li>\n</ul>', 'List item')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Bulleted List (<ul><li>)"
+                      >
+                        List
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<a href="https://example.com" target="_blank" rel="noopener noreferrer">', '</a>', 'Link')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-blue-600 underline border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Hyperlink (<a>)"
+                      >
+                        Link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<pre><code>', '</code></pre>', 'Code')}
+                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 font-mono text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer"
+                        title="Code snippet (<pre><code>)"
+                      >
+                        Code
+                      </button>
 
-              <textarea
-                ref={contentRef}
-                required
-                rows={4}
-                value={currentContent}
-                onChange={(e) =>
-                  handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
-                }
-                onKeyUp={(e) =>
-                  handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
-                }
-                onClick={(e) =>
-                  handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
-                }
-                placeholder={
-                  isMaster
-                    ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
-                    : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
-                }
-                className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed text-slate-900"
-              />
+                      <span className="text-slate-300 mx-0.5">|</span>
+
+                      {/* Inline Image Upload Button */}
+                      <button
+                        type="button"
+                        disabled={uploadingInline}
+                        onClick={() => inlineImageInputRef.current?.click()}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#21759B] hover:bg-[#1a5f7e] text-white font-semibold transition text-[11px] cursor-pointer shadow-xs disabled:opacity-50"
+                        title="Upload and insert image directly inside HTML content"
+                      >
+                        {uploadingInline ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin" /> Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-3 h-3" /> + Inline Image
+                          </>
+                        )}
+                      </button>
+                      <input
+                        ref={inlineImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleInlineImageUpload}
+                        className="hidden"
+                      />
+                    </div>
+
+                    {/* Mode Toggle: HTML Code vs Visual */}
+                    <div className="flex items-center bg-slate-200/70 p-0.5 rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => setEditorMode('code')}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                          editorMode === 'code'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <FileCode className="w-3 h-3" /> HTML Code
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditorMode('visual')}
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
+                          editorMode === 'visual'
+                            ? 'bg-white text-slate-900 shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Eye className="w-3 h-3" /> Visual View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Quick Mention Toolbar for Social Channels */
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                    <AtSign className="w-3 h-3 text-indigo-500" /> Mention:
+                  </span>
+                  {AUDIENCE_TAGS.map((t) => (
+                    <button
+                      key={t.tag}
+                      type="button"
+                      onClick={() => quickInsertMentionToField('content', t.tag)}
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition border border-slate-200 cursor-pointer"
+                    >
+                      {t.tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Editor: Code or Visual */}
+              {isWordPressActive && editorMode === 'visual' ? (
+                <div className="w-full min-h-[160px] max-h-[400px] overflow-y-auto p-4 rounded-xl border border-slate-300 bg-slate-50/50 text-sm leading-relaxed text-slate-900">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        currentContent ||
+                        '<p class="text-slate-400 italic">No content written yet. Switch to "HTML Code" tab above to write or insert HTML tags and inline images.</p>',
+                    }}
+                  />
+                </div>
+              ) : (
+                <textarea
+                  ref={contentRef}
+                  required
+                  rows={isWordPressActive ? 8 : 4}
+                  value={currentContent}
+                  onChange={(e) =>
+                    handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
+                  }
+                  onKeyUp={(e) =>
+                    handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
+                  }
+                  onClick={(e) =>
+                    handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
+                  }
+                  placeholder={
+                    isWordPressActive
+                      ? 'Write your blog post article here using HTML tags like <h2>, <p>, <strong>, <a>, and inline images using the toolbar above...'
+                      : isMaster
+                      ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
+                      : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
+                  }
+                  className={`w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed text-slate-900 ${
+                    isWordPressActive ? 'font-mono text-xs' : ''
+                  }`}
+                />
+              )}
               {renderMentionDropdown('content')}
             </div>
 
-            {/* Direct Media Upload (Images & Videos) */}
+            {/* Direct Media Upload (Featured Media) */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  {isMaster ? 'Master Media Attachment' : `${activeAccount?.name} Media Attachment`}
+                  {isWordPressActive
+                    ? 'Featured Image / Main Media'
+                    : isMaster
+                    ? 'Master Media Attachment'
+                    : `${activeAccount?.name} Media Attachment`}
                 </label>
                 {activeAccount?.platform === 'INSTAGRAM' && (
                   <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
                     Media Required for Instagram
+                  </span>
+                )}
+                {isWordPressActive && (
+                  <span className="text-[10px] font-bold text-[#21759B] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                    WordPress Featured Media
                   </span>
                 )}
               </div>
@@ -1436,6 +1864,129 @@ export default function CreatePostPage() {
               )}
             </div>
           </div>
+
+          {/* WordPress Post Settings (Categories, Tags, Excerpt, Status) */}
+          {isWordPressActive && (
+            <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-xs space-y-4 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-blue-50 text-[#21759B] flex items-center justify-center font-bold">
+                    <Tag className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-sm text-slate-900">WordPress Post Settings</h3>
+                    <p className="text-[11px] text-slate-500">
+                      Categories, tags, excerpt and publication status
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#21759B]">
+                  WordPress Options
+                </span>
+              </div>
+
+              {/* Categories Selector */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Categories (পোস্টের ক্যাটাগরি)
+                  </label>
+                  {loadingWpCategories && (
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Loading categories...
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {wpCategories.length > 0 ? (
+                    wpCategories.map((cat) => {
+                      const isSelected = (currentCategories || []).includes(cat.id);
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            const current = currentCategories || [];
+                            if (isSelected) {
+                              updateActiveCategories(current.filter((id) => id !== cat.id));
+                            } else {
+                              updateActiveCategories([...current, cat.id]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1.5 cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs'
+                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
+                          <span>{cat.name}</span>
+                          {cat.count !== undefined && (
+                            <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                              ({cat.count})
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">
+                      Default WordPress category (Uncategorized) will be used if none selected.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Tags & Status Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Tags */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Post Tags (Comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={currentTags}
+                    onChange={(e) => updateActiveTags(e.target.value)}
+                    placeholder="marketing, tech, news"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B]"
+                  />
+                </div>
+
+                {/* WordPress Post Status */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    WordPress Post Status
+                  </label>
+                  <select
+                    value={currentWpStatus}
+                    onChange={(e) => updateActiveWpStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-800 font-medium"
+                  >
+                    <option value="publish">Publish (পাবলিশ / সরাসরি লাইভ)</option>
+                    <option value="future">Scheduled (শিডিউল অনুযায়ী)</option>
+                    <option value="draft">Draft (ড্রাফট হিসেবে সেভ)</option>
+                    <option value="pending">Pending Review (রিভিউ পেন্ডিং)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Excerpt */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Post Excerpt / Summary (ঐচ্ছিক)
+                </label>
+                <input
+                  type="text"
+                  value={currentExcerpt}
+                  onChange={(e) => updateActiveExcerpt(e.target.value)}
+                  placeholder="Brief summary of the article for blog archives and search engines..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B]"
+                />
+              </div>
+            </div>
+          )}
 
           {/* SECTION 1: Automated First Comment */}
           <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-xs space-y-4">
@@ -1764,14 +2315,18 @@ export default function CreatePostPage() {
             {/* Platform indicator badge */}
             <span
               className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
-                isPreviewLinkedIn
+                isPreviewWordPress
+                  ? 'bg-[#21759B] text-white'
+                  : isPreviewLinkedIn
                   ? 'bg-[#0A66C2] text-white'
                   : isPreviewInstagram
                   ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
                   : 'bg-blue-600 text-white'
               }`}
             >
-              {isPreviewLinkedIn
+              {isPreviewWordPress
+                ? 'WordPress Blog Article'
+                : isPreviewLinkedIn
                 ? 'LinkedIn Desktop Feed'
                 : isPreviewInstagram
                 ? 'Instagram Mobile Feed'
@@ -1815,7 +2370,173 @@ export default function CreatePostPage() {
           {/* MOCKUP CONTAINER */}
           {previewAccount && previewData && (
             <>
-              {isPreviewLinkedIn ? (
+              {isPreviewWordPress ? (
+                /* WORDPRESS BLOG ARTICLE MOCKUP */
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900 animate-in fade-in">
+                  {/* Site Header Bar */}
+                  <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-[#21759B] text-white flex items-center justify-center font-bold text-xs shadow-xs flex-shrink-0">
+                        W
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-xs truncate text-white">
+                          {previewAccount.name || 'WordPress Site'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {previewAccount.pageId || previewAccount.accountId || 'https://yourwebsite.com'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-[#21759B] text-white uppercase tracking-wider">
+                      {previewData.wpStatus || 'Publish'}
+                    </span>
+                  </div>
+
+                  {/* Blog Header & Title */}
+                  <div className="p-5 pb-3 border-b border-slate-100 space-y-2.5">
+                    {/* Categories Badges */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {previewData.categories && previewData.categories.length > 0 ? (
+                        previewData.categories.map((catId) => {
+                          const catObj = wpCategories.find((c) => c.id === catId);
+                          return (
+                            <span
+                              key={catId}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-[#21759B] border border-blue-100"
+                            >
+                              {catObj?.name || `Category #${catId}`}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">
+                          Uncategorized
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Article Heading (H1) */}
+                    <h1 className="text-lg sm:text-xl font-bold text-slate-950 leading-tight">
+                      {previewData.title || (
+                        <span className="text-slate-400 italic">Untitled WordPress Article</span>
+                      )}
+                    </h1>
+
+                    {/* Author & Meta */}
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <ChannelAvatar
+                        avatar={previewAccount.avatar}
+                        name={previewAccount.name}
+                        platform="WORDPRESS"
+                        size="xs"
+                        showBadge={false}
+                      />
+                      <span className="font-semibold text-slate-700">{previewAccount.name || 'Admin'}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-slate-400" />
+                        {publishMode === 'schedule' && scheduledAt
+                          ? new Date(scheduledAt).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })
+                          : 'Today'}
+                      </span>
+                      <span>•</span>
+                      <span>3 min read</span>
+                    </div>
+                  </div>
+
+                  {/* Featured Image */}
+                  {previewData.mediaUrl && (
+                    <div className="relative w-full max-h-72 overflow-hidden bg-slate-900 border-b border-slate-100">
+                      {previewData.mediaType === 'VIDEO' ? (
+                        <video src={previewData.mediaUrl} controls className="w-full max-h-72 object-cover" />
+                      ) : (
+                        <img
+                          src={previewData.mediaUrl}
+                          alt="Featured Media"
+                          className="w-full max-h-72 object-cover"
+                        />
+                      )}
+                      <span className="absolute bottom-2 left-2 text-[9px] font-bold px-2 py-0.5 rounded bg-slate-900/80 text-white">
+                        Featured Media
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Article Content with HTML rendering */}
+                  <div className="p-5 space-y-3">
+                    {previewData.excerpt && (
+                      <div className="p-3 rounded-xl bg-slate-50 border-l-4 border-[#21759B] text-xs italic text-slate-600">
+                        {previewData.excerpt}
+                      </div>
+                    )}
+
+                    <div
+                      className="text-xs sm:text-sm text-slate-800 leading-relaxed space-y-2.5 font-normal"
+                      dangerouslySetInnerHTML={{
+                        __html:
+                          previewData.content ||
+                          '<p class="text-slate-400 italic">Article content with HTML tags and inline images will render here in real time...</p>',
+                      }}
+                    />
+
+                    {/* Tags at bottom */}
+                    {previewData.tags && (
+                      <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+                        <Tag className="w-3 h-3 text-slate-400" />
+                        {previewData.tags.split(',').map((t, idx) => {
+                          const tagClean = t.trim();
+                          if (!tagClean) return null;
+                          return (
+                            <span
+                              key={idx}
+                              className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            >
+                              #{tagClean}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* WordPress Comment Preview if first comment enabled */}
+                  {previewData.enableFirstComment && previewData.firstCommentContent.trim() && (
+                    <div className="p-4 bg-slate-50 border-t border-slate-200/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#21759B] flex items-center gap-1">
+                          <MessageCircle className="w-3 h-3" /> 1 Comment on Article ({previewData.firstCommentDelay === 0 ? 'Instant' : `+${previewData.firstCommentDelay}m`})
+                        </span>
+                      </div>
+
+                      <div className="flex items-start gap-2.5">
+                        <ChannelAvatar
+                          avatar={previewAccount.avatar}
+                          name={previewAccount.name}
+                          platform="WORDPRESS"
+                          size="sm"
+                          showBadge={false}
+                        />
+                        <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-slate-900">
+                              {previewAccount.name || 'Author'}
+                            </p>
+                            <span className="text-[10px] text-slate-400">Post Author</span>
+                          </div>
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap mt-1 leading-relaxed">
+                            {previewData.firstCommentContent}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : isPreviewLinkedIn ? (
                 /* LINKEDIN DESKTOP FEED MOCKUP */
                 <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
                   <div className="p-4 flex items-start justify-between gap-3">

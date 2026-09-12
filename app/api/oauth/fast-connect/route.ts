@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
 
     let effectiveAccountId = accountId?.trim();
     if (!effectiveAccountId) {
-      if (cleanPlatform === 'LINKEDIN') {
+      if (cleanPlatform === 'WORDPRESS') {
+        effectiveAccountId = `https://techcraft-demo.example.com`;
+      } else if (cleanPlatform === 'LINKEDIN') {
         effectiveAccountId = `urn:li:person:${randomSuffix}`;
       } else if (cleanPlatform === 'INSTAGRAM') {
         effectiveAccountId = `1784140${randomSuffix}`;
@@ -47,7 +49,9 @@ export async function POST(req: NextRequest) {
     // Default high-quality avatars if none provided
     let effectiveAvatar = avatar?.trim();
     if (!effectiveAvatar) {
-      if (cleanPlatform === 'LINKEDIN') {
+      if (cleanPlatform === 'WORDPRESS') {
+        effectiveAvatar = 'https://s.w.org/style/images/about/WordPress-logotype-wmark.png';
+      } else if (cleanPlatform === 'LINKEDIN') {
         effectiveAvatar = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
       } else if (cleanPlatform === 'INSTAGRAM') {
         effectiveAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
@@ -57,7 +61,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Auto-generated verified token for instant operations
-    const autoToken = `AUTOCONNECT_${cleanPlatform}_TOKEN_${Date.now()}_${randomSuffix}`;
+    const autoToken = cleanPlatform === 'WORDPRESS'
+      ? `demouser:::TEST_WP_APP_PASSWORD_${randomSuffix}`
+      : `AUTOCONNECT_${cleanPlatform}_TOKEN_${Date.now()}_${randomSuffix}`;
 
     const account = await prisma.socialAccount.upsert({
       where: {
@@ -70,7 +76,7 @@ export async function POST(req: NextRequest) {
       update: {
         name: cleanName,
         avatar: effectiveAvatar,
-        category: category || (cleanPlatform === 'LINKEDIN' ? 'LinkedIn Member Profile' : 'Facebook Page'),
+        category: category || (cleanPlatform === 'WORDPRESS' ? 'WordPress Site / Blog' : cleanPlatform === 'LINKEDIN' ? 'LinkedIn Member Profile' : 'Facebook Page'),
         accessToken: autoToken,
         isActive: true,
       },

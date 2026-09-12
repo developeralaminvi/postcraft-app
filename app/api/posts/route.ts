@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { publishFacebookPost, publishFacebookComment } from '@/lib/facebook';
 import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
+import { publishWordPressPost, publishWordPressComment } from '@/lib/wordpress';
 
 export async function GET() {
   try {
@@ -49,7 +50,12 @@ export async function POST(req: NextRequest) {
     const {
       accountId,
       accountIds,
+      title,
       content = '',
+      categories,
+      tags,
+      excerpt,
+      wpStatus,
       mediaUrl,
       mediaType = 'TEXT',
       publishNow = false,
@@ -96,6 +102,22 @@ export async function POST(req: NextRequest) {
           ? custom.content.trim()
           : content.trim();
 
+        const effectiveTitle = (isCustom && (custom as any)?.title?.trim())
+          ? (custom as any).title.trim()
+          : (title?.trim() || null);
+
+        const effectiveCategories = (isCustom && (custom as any)?.categories !== undefined)
+          ? (custom as any).categories
+          : categories;
+
+        const effectiveTags = (isCustom && (custom as any)?.tags !== undefined)
+          ? (custom as any).tags
+          : tags;
+
+        const effectiveExcerpt = (isCustom && (custom as any)?.excerpt !== undefined)
+          ? (custom as any).excerpt
+          : excerpt;
+
         const effectiveMediaUrl = (isCustom && custom?.mediaUrl !== undefined)
           ? (custom.mediaUrl?.trim() || null)
           : (mediaUrl?.trim() || null);
@@ -114,7 +136,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
 
-        if (!effectiveContent) {
+        if (!effectiveContent && !effectiveTitle) {
           errors.push(`Content for ${account.name} cannot be empty.`);
           continue;
         }
@@ -127,7 +149,20 @@ export async function POST(req: NextRequest) {
 
         if (publishNow) {
           let publishRes;
-          if (account.platform === 'LINKEDIN') {
+          if (account.platform === 'WORDPRESS') {
+            publishRes = await publishWordPressPost({
+              siteUrl: account.accountId,
+              credentials: account.accessToken,
+              title: effectiveTitle || 'Untitled Post',
+              content: effectiveContent,
+              status: (wpStatus as any) || 'publish',
+              scheduledAt: !publishNow && scheduledAt ? new Date(scheduledAt) : null,
+              categories: Array.isArray(effectiveCategories) ? effectiveCategories : undefined,
+              tags: Array.isArray(effectiveTags) ? effectiveTags : undefined,
+              mediaUrl: effectiveMediaUrl,
+              excerpt: effectiveExcerpt,
+            });
+          } else if (account.platform === 'LINKEDIN') {
             publishRes = await publishLinkedInPost({
               authorUrn: account.accountId,
               accessToken: account.accessToken,
@@ -170,9 +205,21 @@ export async function POST(req: NextRequest) {
           data: {
             userId: user.id,
             accountId: account.id,
+            title: effectiveTitle,
             content: effectiveContent,
             mediaUrl: effectiveMediaUrl,
             mediaType: effectiveMediaType,
+            categories: Array.isArray(effectiveCategories)
+              ? JSON.stringify(effectiveCategories)
+              : typeof effectiveCategories === 'string'
+              ? effectiveCategories
+              : null,
+            tags: Array.isArray(effectiveTags)
+              ? JSON.stringify(effectiveTags)
+              : typeof effectiveTags === 'string'
+              ? effectiveTags
+              : null,
+            excerpt: effectiveExcerpt,
             status: postStatus,
             scheduledAt: !publishNow && scheduledAt ? new Date(scheduledAt) : null,
             publishedAt: publishedDate,
@@ -189,7 +236,14 @@ export async function POST(req: NextRequest) {
           if (publishNow && publishedPostId) {
             if (delay === 0) {
               let commentRes;
-              if (account.platform === 'LINKEDIN') {
+              if (account.platform === 'WORDPRESS') {
+                commentRes = await publishWordPressComment({
+                  siteUrl: account.accountId,
+                  credentials: account.accessToken,
+                  postId: publishedPostId,
+                  content: effectiveAutoComment.content.trim(),
+                });
+              } else if (account.platform === 'LINKEDIN') {
                 commentRes = await publishLinkedInComment({
                   postUrn: publishedPostId,
                   accessToken: account.accessToken,

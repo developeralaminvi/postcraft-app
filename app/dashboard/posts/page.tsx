@@ -15,7 +15,8 @@ import {
   Loader2,
   RefreshCw,
   Linkedin,
-  Instagram
+  Instagram,
+  Globe
 } from 'lucide-react';
 
 interface Comment {
@@ -30,6 +31,10 @@ interface Comment {
 
 interface Post {
   id: string;
+  title?: string;
+  categories?: string;
+  tags?: string;
+  excerpt?: string;
   content: string;
   mediaUrl?: string;
   status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED';
@@ -199,7 +204,9 @@ export default function PostsPage() {
                   <div className="flex items-center gap-3">
                     <div
                       className={`h-10 w-10 rounded-xl text-white flex items-center justify-center font-bold text-xs flex-shrink-0 overflow-hidden ${
-                        post.account.platform === 'LINKEDIN'
+                        post.account.platform === 'WORDPRESS'
+                          ? 'bg-[#21759B]'
+                          : post.account.platform === 'LINKEDIN'
                           ? 'bg-[#0A66C2]'
                           : post.account.platform === 'INSTAGRAM'
                           ? 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600'
@@ -212,6 +219,8 @@ export default function PostsPage() {
                           alt="Avatar"
                           className="h-full w-full object-cover"
                         />
+                      ) : post.account.platform === 'WORDPRESS' ? (
+                        <Globe className="w-5 h-5" />
                       ) : post.account.platform === 'LINKEDIN' ? (
                         <Linkedin className="w-5 h-5" />
                       ) : post.account.platform === 'INSTAGRAM' ? (
@@ -227,7 +236,9 @@ export default function PostsPage() {
                         </span>
                         <span
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                            post.account.platform === 'LINKEDIN'
+                            post.account.platform === 'WORDPRESS'
+                              ? 'bg-blue-50 text-[#21759B] border-blue-200'
+                              : post.account.platform === 'LINKEDIN'
                               ? 'bg-blue-50 text-[#0A66C2] border-blue-200'
                               : post.account.platform === 'INSTAGRAM'
                               ? 'bg-pink-50 text-pink-700 border-pink-200'
@@ -281,7 +292,15 @@ export default function PostsPage() {
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" /> View on {post.account.platform === 'LINKEDIN' ? 'LinkedIn' : post.account.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
+                        <ExternalLink className="w-3.5 h-3.5" /> View on {
+                          post.account.platform === 'WORDPRESS'
+                            ? 'WordPress'
+                            : post.account.platform === 'LINKEDIN'
+                            ? 'LinkedIn'
+                            : post.account.platform === 'INSTAGRAM'
+                            ? 'Instagram'
+                            : 'Facebook'
+                        }
                       </a>
                     )}
 
@@ -310,8 +329,29 @@ export default function PostsPage() {
                   </div>
                 </div>
 
+                {/* WordPress Article Title if present */}
+                {post.title && (
+                  <div className="mt-3 pl-13">
+                    <h4 className="font-bold text-sm text-slate-900 leading-snug">
+                      {post.title}
+                    </h4>
+                    {post.categories && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {post.categories.split(',').map((c, i) => (
+                          <span
+                            key={i}
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-[#21759B] border border-blue-100"
+                          >
+                            Category #{c.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Content & Media body */}
-                <div className="mt-4 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed pl-13">
+                <div className="mt-3 text-xs text-slate-700 whitespace-pre-wrap leading-relaxed pl-13">
                   {post.content}
                 </div>
 

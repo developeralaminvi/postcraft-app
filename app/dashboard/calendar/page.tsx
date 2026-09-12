@@ -18,7 +18,8 @@ import {
   X,
   ThumbsUp,
   Instagram,
-  Linkedin
+  Linkedin,
+  Globe
 } from 'lucide-react';
 
 interface Milestone {
@@ -31,6 +32,7 @@ interface Milestone {
 
 interface Post {
   id: string;
+  title?: string;
   content: string;
   mediaUrl?: string;
   mediaType: string;
@@ -249,7 +251,11 @@ export default function CalendarPage() {
                       >
                         <div className="flex items-center justify-between gap-1 text-[10px] font-semibold mb-0.5">
                           <span className="truncate flex items-center gap-1">
-                            {post.account?.platform === 'LINKEDIN' ? (
+                            {post.account?.platform === 'WORDPRESS' ? (
+                              <span className="p-0.5 rounded bg-[#21759B] text-white inline-flex items-center justify-center">
+                                <Globe className="w-2.5 h-2.5" />
+                              </span>
+                            ) : post.account?.platform === 'LINKEDIN' ? (
                               <span className="p-0.5 rounded bg-[#0A66C2] text-white inline-flex items-center justify-center">
                                 <Linkedin className="w-2.5 h-2.5" />
                               </span>
@@ -269,7 +275,7 @@ export default function CalendarPage() {
                           </span>
                         </div>
                         <p className="text-[11px] line-clamp-1 opacity-90 leading-tight">
-                          {post.content}
+                          {post.title || post.content}
                         </p>
                       </div>
                     );
@@ -316,6 +322,18 @@ export default function CalendarPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Post Title if available */}
+            {selectedPost.title && (
+              <div>
+                <p className="text-xs font-semibold text-[#21759B] uppercase tracking-wider mb-1">
+                  Article Title
+                </p>
+                <p className="text-sm font-bold text-slate-900 bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                  {selectedPost.title}
+                </p>
+              </div>
+            )}
 
             {/* Post Content */}
             <div>
@@ -404,14 +422,18 @@ export default function CalendarPage() {
                   target="_blank"
                   rel="noreferrer"
                   className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-white text-xs font-semibold transition ${
-                    selectedPost.account?.platform === 'LINKEDIN'
+                    selectedPost.account?.platform === 'WORDPRESS'
+                      ? 'bg-[#21759B] hover:bg-[#1a5f7e]'
+                      : selectedPost.account?.platform === 'LINKEDIN'
                       ? 'bg-[#0A66C2] hover:bg-[#004182]'
                       : selectedPost.account?.platform === 'INSTAGRAM'
                       ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:opacity-90'
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {selectedPost.account?.platform === 'LINKEDIN'
+                  {selectedPost.account?.platform === 'WORDPRESS'
+                    ? 'View Live on WordPress'
+                    : selectedPost.account?.platform === 'LINKEDIN'
                     ? 'View Live on LinkedIn'
                     : selectedPost.account?.platform === 'INSTAGRAM'
                     ? 'View Live on Instagram'

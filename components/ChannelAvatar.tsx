@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
@@ -59,6 +59,16 @@ export default function ChannelAvatar({
   const s = sizeMap[size] || sizeMap.md;
 
   const renderBadgeIcon = () => {
+    if (normPlatform === 'WORDPRESS') {
+      return (
+        <span
+          className={`absolute ${s.badge} rounded-full bg-[#21759B] text-white flex items-center justify-center border-white shadow-xs z-10 flex-shrink-0`}
+          title="WordPress"
+        >
+          <Globe className={s.badgeIcon} />
+        </span>
+      );
+    }
     if (normPlatform === 'LINKEDIN') {
       return (
         <span
@@ -107,7 +117,9 @@ export default function ChannelAvatar({
       ) : (
         <div
           className={`w-full h-full rounded-full flex items-center justify-center font-bold text-white shadow-2xs ${
-            normPlatform === 'LINKEDIN'
+            normPlatform === 'WORDPRESS'
+              ? 'bg-[#21759B]'
+              : normPlatform === 'LINKEDIN'
               ? 'bg-[#0A66C2]'
               : normPlatform === 'INSTAGRAM'
               ? 'bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600'

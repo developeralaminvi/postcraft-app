@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { verifyFacebookPage, verifyFacebookAccount } from '@/lib/facebook';
 import { verifyInstagramAccount } from '@/lib/instagram';
 import { verifyLinkedInAccount } from '@/lib/linkedin';
+import { verifyWordPressAccount } from '@/lib/wordpress';
 
 export async function GET() {
   try {
@@ -44,7 +45,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { platform = 'FACEBOOK', pageId, accessToken, accountType = 'PAGE' } = await req.json();
+    const body = await req.json();
+    const {
+      platform = 'FACEBOOK',
+      pageId,
+      accessToken,
+      accountType = 'PAGE',
+      username: reqUsername,
+      appPassword: reqAppPassword,
+    } = body;
 
     if (!pageId || !accessToken) {
       return NextResponse.json(
@@ -91,6 +100,34 @@ export async function POST(req: NextRequest) {
         name: `@${verification.data.username.replace(/^@/, '')}`,
         avatar: verification.data.avatar,
         category: isProfile ? 'Instagram Creator Profile' : 'Instagram Business',
+        token: verification.data.accessToken,
+      };
+    } else if (platform === 'WORDPRESS') {
+      const siteUrl = pageId.trim();
+      let username = reqUsername || '';
+      let appPassword = reqAppPassword || '';
+      if (!username && accessToken.includes(':::')) {
+        const parts = accessToken.split(':::');
+        username = parts[0];
+        appPassword = parts.slice(1).join(':::');
+      } else if (!username) {
+        username = 'admin';
+        appPassword = accessToken;
+      }
+
+      const verification = await verifyWordPressAccount(siteUrl, username, appPassword);
+      if (!verification.success || !verification.data) {
+        return NextResponse.json(
+          { error: verification.error || 'Invalid WordPress credentials or unreachable site URL.' },
+          { status: 400 }
+        );
+      }
+
+      accountData = {
+        id: verification.data.id,
+        name: verification.data.name,
+        avatar: verification.data.avatar,
+        category: 'WordPress Site / Blog',
         token: verification.data.accessToken,
       };
     } else {

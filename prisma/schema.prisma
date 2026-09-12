@@ -44,16 +44,20 @@ model Post {
   accountId       String
   account         SocialAccount      @relation(fields: [accountId], references: [id], onDelete: Cascade)
   content         String
+  title           String?            // Post / Article Title (especially for WordPress)
   mediaUrl        String?
   mediaType       String             @default("TEXT") // TEXT, IMAGE, VIDEO
+  categories      String?            // JSON string or comma-separated category IDs / names
+  tags            String?            // JSON string or comma-separated tags
+  excerpt         String?            // Optional summary / excerpt
   reactionsCount  Int                @default(0)
   commentsCount   Int                @default(0)
   lastPolledAt    DateTime?
   scheduledAt     DateTime?
   publishedAt     DateTime?
   status          String             @default("DRAFT") // DRAFT, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
-  platformPostId  String?            // Facebook Post ID returned from Graph API
-  platformPostUrl String?            // Link to view post on Facebook
+  platformPostId  String?            // Facebook Post ID, LinkedIn URN, or WordPress Post ID
+  platformPostUrl String?            // Link to view post on platform
   errorMessage    String?
   comments        Comment[]
   milestones      MilestoneTrigger[]

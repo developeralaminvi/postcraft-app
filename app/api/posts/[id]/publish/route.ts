@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { publishFacebookPost, publishFacebookComment } from '@/lib/facebook';
 import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
+import { publishWordPressPost, publishWordPressComment } from '@/lib/wordpress';
 
 export async function POST(
   req: NextRequest,
@@ -32,7 +33,37 @@ export async function POST(
     const platform = post.account.platform;
     let publishRes;
 
-    if (platform === 'LINKEDIN') {
+    if (platform === 'WORDPRESS') {
+      let parsedCategories;
+      try {
+        if (post.categories) {
+          parsedCategories = JSON.parse(post.categories);
+        }
+      } catch {
+        parsedCategories = post.categories ? post.categories.split(',').map((c) => c.trim()) : undefined;
+      }
+
+      let parsedTags;
+      try {
+        if (post.tags) {
+          parsedTags = JSON.parse(post.tags);
+        }
+      } catch {
+        parsedTags = post.tags ? post.tags.split(',').map((t) => t.trim()) : undefined;
+      }
+
+      publishRes = await publishWordPressPost({
+        siteUrl: post.account.accountId,
+        credentials: post.account.accessToken,
+        title: post.title || 'Untitled Post',
+        content: post.content,
+        status: 'publish',
+        categories: parsedCategories,
+        tags: parsedTags,
+        mediaUrl: post.mediaUrl,
+        excerpt: post.excerpt,
+      });
+    } else if (platform === 'LINKEDIN') {
       publishRes = await publishLinkedInPost({
         authorUrn: post.account.accountId,
         accessToken: post.account.accessToken,
@@ -88,7 +119,14 @@ export async function POST(
     for (const comment of post.comments) {
       if (comment.delayMinutes === 0) {
         let commentRes;
-        if (platform === 'LINKEDIN') {
+        if (platform === 'WORDPRESS') {
+          commentRes = await publishWordPressComment({
+            siteUrl: post.account.accountId,
+            credentials: post.account.accessToken,
+            postId: publishRes.postId,
+            content: comment.content,
+          });
+        } else if (platform === 'LINKEDIN') {
           commentRes = await publishLinkedInComment({
             postUrn: publishRes.postId,
             accessToken: post.account.accessToken,

@@ -20,6 +20,10 @@ import {
   getLinkedInRecentComments,
   replyToLinkedInComment,
 } from './linkedin';
+import {
+  publishWordPressPost,
+  publishWordPressComment,
+} from './wordpress';
 
 /**
  * Process all scheduled posts that are due for publishing
@@ -53,7 +57,33 @@ export async function processDuePosts() {
       const platform = post.account.platform;
 
       let publishResult;
-      if (platform === 'LINKEDIN') {
+      if (platform === 'WORDPRESS') {
+        let parsedCategories;
+        try {
+          if (post.categories) parsedCategories = JSON.parse(post.categories);
+        } catch {
+          parsedCategories = post.categories ? post.categories.split(',').map((c) => c.trim()) : undefined;
+        }
+
+        let parsedTags;
+        try {
+          if (post.tags) parsedTags = JSON.parse(post.tags);
+        } catch {
+          parsedTags = post.tags ? post.tags.split(',').map((t) => t.trim()) : undefined;
+        }
+
+        publishResult = await publishWordPressPost({
+          siteUrl: post.account.accountId,
+          credentials: post.account.accessToken,
+          title: post.title || 'Untitled Post',
+          content: post.content,
+          status: 'publish',
+          categories: parsedCategories,
+          tags: parsedTags,
+          mediaUrl: post.mediaUrl,
+          excerpt: post.excerpt,
+        });
+      } else if (platform === 'LINKEDIN') {
         publishResult = await publishLinkedInPost({
           authorUrn: post.account.accountId,
           accessToken: post.account.accessToken,
@@ -106,7 +136,14 @@ export async function processDuePosts() {
       for (const comment of post.comments) {
         if (comment.delayMinutes === 0) {
           let commentResult;
-          if (platform === 'LINKEDIN') {
+          if (platform === 'WORDPRESS') {
+            commentResult = await publishWordPressComment({
+              siteUrl: post.account.accountId,
+              credentials: post.account.accessToken,
+              postId: publishResult.postId,
+              content: comment.content,
+            });
+          } else if (platform === 'LINKEDIN') {
             commentResult = await publishLinkedInComment({
               postUrn: publishResult.postId,
               accessToken: post.account.accessToken,
@@ -198,7 +235,14 @@ export async function processDueComments() {
 
       const platform = parentPost.account.platform;
       let commentResult;
-      if (platform === 'LINKEDIN') {
+      if (platform === 'WORDPRESS') {
+        commentResult = await publishWordPressComment({
+          siteUrl: parentPost.account.accountId,
+          credentials: parentPost.account.accessToken,
+          postId: parentPost.platformPostId,
+          content: comment.content,
+        });
+      } else if (platform === 'LINKEDIN') {
         commentResult = await publishLinkedInComment({
           postUrn: parentPost.platformPostId,
           accessToken: parentPost.account.accessToken,
