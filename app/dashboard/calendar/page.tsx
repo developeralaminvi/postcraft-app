@@ -16,7 +16,8 @@ import {
   Sparkles,
   ExternalLink,
   X,
-  ThumbsUp
+  ThumbsUp,
+  Instagram
 } from 'lucide-react';
 
 interface Milestone {
@@ -42,6 +43,7 @@ interface Post {
   account: {
     name: string;
     avatar?: string;
+    platform?: string;
   };
   comments: Array<{ content: string; status: string }>;
   milestones: Milestone[];
@@ -245,7 +247,14 @@ export default function CalendarPage() {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-1 text-[10px] font-semibold mb-0.5">
-                          <span className="truncate">{post.account?.name || 'FB'}</span>
+                          <span className="truncate flex items-center gap-1">
+                            {post.account?.platform === 'INSTAGRAM' ? (
+                              <span className="p-0.5 rounded bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white inline-flex items-center justify-center">
+                                <Instagram className="w-2.5 h-2.5" />
+                              </span>
+                            ) : null}
+                            {post.account?.name || 'FB'}
+                          </span>
                           <span className="flex items-center gap-0.5 flex-shrink-0">
                             {post.mediaType === 'VIDEO' ? (
                               <Video className="w-2.5 h-2.5" />
@@ -273,6 +282,11 @@ export default function CalendarPage() {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
+                {selectedPost.account?.platform === 'INSTAGRAM' ? (
+                  <span className="p-1 rounded-lg bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white flex items-center justify-center">
+                    <Instagram className="w-3.5 h-3.5" />
+                  </span>
+                ) : null}
                 <span className="font-bold text-sm text-slate-900">
                   {selectedPost.account?.name}
                 </span>
@@ -380,9 +394,16 @@ export default function CalendarPage() {
                   href={selectedPost.platformPostUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition"
+                  className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-white text-xs font-semibold transition ${
+                    selectedPost.account?.platform === 'INSTAGRAM'
+                      ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:opacity-90'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
-                  View Live on Facebook <ExternalLink className="w-3.5 h-3.5" />
+                  {selectedPost.account?.platform === 'INSTAGRAM'
+                    ? 'View Live on Instagram'
+                    : 'View Live on Facebook'}{' '}
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </a>
               </div>
             )}

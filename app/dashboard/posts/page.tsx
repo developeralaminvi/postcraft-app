@@ -195,7 +195,13 @@ export default function PostsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   {/* Account & Status Header */}
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0 overflow-hidden">
+                    <div
+                      className={`h-10 w-10 rounded-xl text-white flex items-center justify-center font-bold text-xs flex-shrink-0 overflow-hidden ${
+                        post.account.platform === 'INSTAGRAM'
+                          ? 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600'
+                          : 'bg-blue-600'
+                      }`}
+                    >
                       {post.account.avatar ? (
                         <img
                           src={post.account.avatar}
@@ -210,6 +216,15 @@ export default function PostsPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-sm text-slate-900">
                           {post.account.name}
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                            post.account.platform === 'INSTAGRAM'
+                              ? 'bg-pink-50 text-pink-700 border-pink-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}
+                        >
+                          {post.account.platform}
                         </span>
                         <span
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
@@ -249,6 +264,17 @@ export default function PostsPage() {
 
                   {/* Action buttons */}
                   <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {post.platformPostUrl && (
+                      <a
+                        href={post.platformPostUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> View on {post.account.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
+                      </a>
+                    )}
+
                     {isScheduled && (
                       <button
                         onClick={() => handlePublishNow(post.id)}

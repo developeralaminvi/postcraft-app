@@ -6,6 +6,13 @@ import {
   getPostRecentComments,
   replyToComment,
 } from './facebook';
+import {
+  publishInstagramPost,
+  publishInstagramComment,
+  getInstagramEngagement,
+  getInstagramRecentComments,
+  replyToInstagramComment,
+} from './instagram';
 
 /**
  * Process all scheduled posts that are due for publishing
@@ -36,20 +43,33 @@ export async function processDuePosts() {
         data: { status: 'PUBLISHING' },
       });
 
-      const publishResult = await publishFacebookPost({
-        pageId: post.account.accountId,
-        accessToken: post.account.accessToken,
-        message: post.content,
-        mediaUrl: post.mediaUrl,
-        mediaType: (post.mediaType as any) || 'TEXT',
-      });
+      const isInstagram = post.account.platform === 'INSTAGRAM';
+
+      let publishResult;
+      if (isInstagram) {
+        publishResult = await publishInstagramPost({
+          igUserId: post.account.accountId,
+          accessToken: post.account.accessToken,
+          caption: post.content,
+          mediaUrl: post.mediaUrl || '',
+          mediaType: (post.mediaType as any) || 'IMAGE',
+        });
+      } else {
+        publishResult = await publishFacebookPost({
+          pageId: post.account.accountId,
+          accessToken: post.account.accessToken,
+          message: post.content,
+          mediaUrl: post.mediaUrl,
+          mediaType: (post.mediaType as any) || 'TEXT',
+        });
+      }
 
       if (!publishResult.success || !publishResult.postId) {
         await prisma.post.update({
           where: { id: post.id },
           data: {
             status: 'FAILED',
-            errorMessage: publishResult.error || 'Failed to publish post to Facebook',
+            errorMessage: publishResult.error || `Failed to publish post to ${post.account.platform}`,
           },
         });
         results.push({ id: post.id, status: 'FAILED', error: publishResult.error });
@@ -70,11 +90,20 @@ export async function processDuePosts() {
       // Handle attached first comments
       for (const comment of post.comments) {
         if (comment.delayMinutes === 0) {
-          const commentResult = await publishFacebookComment({
-            postId: publishResult.postId,
-            accessToken: post.account.accessToken,
-            message: comment.content,
-          });
+          let commentResult;
+          if (isInstagram) {
+            commentResult = await publishInstagramComment({
+              mediaId: publishResult.postId,
+              accessToken: post.account.accessToken,
+              message: comment.content,
+            });
+          } else {
+            commentResult = await publishFacebookComment({
+              postId: publishResult.postId,
+              accessToken: post.account.accessToken,
+              message: comment.content,
+            });
+          }
 
           await prisma.comment.update({
             where: { id: comment.id },
@@ -146,11 +175,21 @@ export async function processDueComments() {
         continue;
       }
 
-      const commentResult = await publishFacebookComment({
-        postId: parentPost.platformPostId,
-        accessToken: parentPost.account.accessToken,
-        message: comment.content,
-      });
+      const isInstagram = parentPost.account.platform === 'INSTAGRAM';
+      let commentResult;
+      if (isInstagram) {
+        commentResult = await publishInstagramComment({
+          mediaId: parentPost.platformPostId,
+          accessToken: parentPost.account.accessToken,
+          message: comment.content,
+        });
+      } else {
+        commentResult = await publishFacebookComment({
+          postId: parentPost.platformPostId,
+          accessToken: parentPost.account.accessToken,
+          message: comment.content,
+        });
+      }
 
       if (commentResult.success) {
         await prisma.comment.update({
@@ -217,11 +256,25 @@ export async function processMilestoneTriggers() {
     if (!post.platformPostId) continue;
 
     try {
-      // Get live engagement stats from Facebook Graph API
-      const { reactionsCount, commentsCount } = await getPostEngagement(
-        post.platformPostId,
-        post.account.accessToken
-      );
+      const isInstagram = post.account.platform === 'INSTAGRAM';
+      let reactionsCount = 0;
+      let commentsCount = 0;
+
+      if (isInstagram) {
+        const stats = await getInstagramEngagement(
+          post.platformPostId,
+          post.account.accessToken
+        );
+        reactionsCount = stats.reactionsCount;
+        commentsCount = stats.commentsCount;
+      } else {
+        const stats = await getPostEngagement(
+          post.platformPostId,
+          post.account.accessToken
+        );
+        reactionsCount = stats.reactionsCount;
+        commentsCount = stats.commentsCount;
+      }
 
       // Update post counts
       await prisma.post.update({
@@ -244,11 +297,20 @@ export async function processMilestoneTriggers() {
         }
 
         if (shouldTrigger) {
-          const commentResult = await publishFacebookComment({
-            postId: post.platformPostId,
-            accessToken: post.account.accessToken,
-            message: milestone.commentText,
-          });
+          let commentResult;
+          if (isInstagram) {
+            commentResult = await publishInstagramComment({
+              mediaId: post.platformPostId,
+              accessToken: post.account.accessToken,
+              message: milestone.commentText,
+            });
+          } else {
+            commentResult = await publishFacebookComment({
+              postId: post.platformPostId,
+              accessToken: post.account.accessToken,
+              message: milestone.commentText,
+            });
+          }
 
           await prisma.milestoneTrigger.update({
             where: { id: milestone.id },
@@ -301,11 +363,22 @@ export async function processAutoReplies() {
     if (!post.platformPostId || !post.autoReply?.isEnabled) continue;
 
     try {
-      const recentComments = await getPostRecentComments(
-        post.platformPostId,
-        post.account.accessToken,
-        post.account.accountId
-      );
+      const isInstagram = post.account.platform === 'INSTAGRAM';
+      let recentComments: Array<{ id: string; message: string; fromId?: string; fromName?: string }> = [];
+
+      if (isInstagram) {
+        recentComments = await getInstagramRecentComments(
+          post.platformPostId,
+          post.account.accessToken,
+          post.account.accountId
+        );
+      } else {
+        recentComments = await getPostRecentComments(
+          post.platformPostId,
+          post.account.accessToken,
+          post.account.accountId
+        );
+      }
 
       for (const comment of recentComments) {
         if (comment.id === post.autoReply.lastRepliedCommentId) {
@@ -314,11 +387,20 @@ export async function processAutoReplies() {
         }
 
         // Reply to user comment
-        const replyRes = await replyToComment({
-          commentId: comment.id,
-          accessToken: post.account.accessToken,
-          message: post.autoReply.replyText,
-        });
+        let replyRes;
+        if (isInstagram) {
+          replyRes = await replyToInstagramComment({
+            commentId: comment.id,
+            accessToken: post.account.accessToken,
+            message: post.autoReply.replyText,
+          });
+        } else {
+          replyRes = await replyToComment({
+            commentId: comment.id,
+            accessToken: post.account.accessToken,
+            message: post.autoReply.replyText,
+          });
+        }
 
         if (replyRes.success) {
           await prisma.autoReplyRule.update({

@@ -20,7 +20,11 @@ import {
   Globe,
   Plus,
   Trash2,
-  X
+  X,
+  Instagram,
+  Heart,
+  Bookmark,
+  MoreHorizontal
 } from 'lucide-react';
 
 interface Account {
@@ -28,6 +32,7 @@ interface Account {
   name: string;
   avatar?: string;
   accountId: string;
+  platform: string;
 }
 
 interface MilestoneInput {
@@ -168,13 +173,21 @@ export default function CreatePostPage() {
     setError(null);
     setSuccess(null);
 
+    const targetAccount = accounts.find((a) => a.id === selectedAccountId);
+    const isInstagram = targetAccount?.platform === 'INSTAGRAM';
+
     if (!selectedAccountId) {
-      setError('Please select or connect a Facebook Page first.');
+      setError('Please select or connect a social account first.');
+      return;
+    }
+
+    if (isInstagram && !mediaUrl) {
+      setError('Instagram posts require an image or video attachment. Please upload an image or video above before publishing.');
       return;
     }
 
     if (!content.trim()) {
-      setError('Post content cannot be empty.');
+      setError('Post caption cannot be empty.');
       return;
     }
 
@@ -217,7 +230,7 @@ export default function CreatePostPage() {
 
       setSuccess(
         publishMode === 'now'
-          ? 'Post published to Facebook successfully!'
+          ? `Post published to ${isInstagram ? 'Instagram' : 'Facebook'} successfully!`
           : 'Post scheduled successfully!'
       );
 
@@ -267,9 +280,9 @@ export default function CreatePostPage() {
 
             {accounts.length === 0 ? (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-                <span>No Facebook Page connected yet.</span>
+                <span>No Facebook Page or Instagram Account connected yet.</span>
                 <a href="/dashboard/accounts" className="font-semibold underline text-amber-900">
-                  Connect Page
+                  Connect Account
                 </a>
               </div>
             ) : (
@@ -280,7 +293,7 @@ export default function CreatePostPage() {
               >
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    Facebook: {acc.name} ({acc.accountId})
+                    {acc.platform === 'INSTAGRAM' ? '📸 Instagram' : '🌐 Facebook'}: {acc.name} ({acc.accountId})
                   </option>
                 ))}
               </select>
@@ -629,116 +642,254 @@ export default function CreatePostPage() {
 
         {/* Right: Live Mockup Preview (5 cols) */}
         <div className="lg:col-span-5 sticky top-8 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Live Mockup Preview
-            </span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full">
-              Facebook Desktop
-            </span>
-          </div>
+          {(() => {
+            const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
 
-          {/* Facebook Card Mockup */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-            {/* Header */}
-            <div className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 overflow-hidden">
-                {selectedAccount?.avatar ? (
-                  <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover" />
-                ) : (
-                  selectedAccount?.name?.slice(0, 2).toUpperCase() || 'FB'
-                )}
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm text-slate-900 leading-snug truncate">
-                  {selectedAccount?.name || 'Your Facebook Page'}
-                </p>
-                <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                  Just now · <Globe className="w-3 h-3 text-slate-400 inline" />
-                </p>
-              </div>
-            </div>
-
-            {/* Post Text */}
-            <div className="px-4 pb-3">
-              <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-                {content || 'Your post caption will appear here in real time...'}
-              </p>
-            </div>
-
-            {/* Media Preview (Video or Image) */}
-            {mediaUrl && (
-              <div className="w-full bg-slate-900 max-h-80 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
-                {mediaType === 'VIDEO' ? (
-                  <video src={mediaUrl} controls className="w-full max-h-80 object-cover" />
-                ) : (
-                  <img src={mediaUrl} alt="Attachment" className="w-full object-cover max-h-80" />
-                )}
-              </div>
-            )}
-
-            {/* Reaction bar */}
-            <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-around text-slate-500 text-xs font-semibold">
-              <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
-                <ThumbsUp className="w-4 h-4" /> Like
-              </span>
-              <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
-                <MessageCircle className="w-4 h-4" /> Comment
-              </span>
-              <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
-                <Share2 className="w-4 h-4" /> Share
-              </span>
-            </div>
-
-            {/* Auto First Comment Preview */}
-            {enableFirstComment && firstCommentContent.trim() && (
-              <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
-                </span>
-
-                <div className="flex items-start gap-2.5">
-                  <div className="h-7 w-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-                    {selectedAccount?.name?.slice(0, 1).toUpperCase() || 'P'}
-                  </div>
-                  <div className="bg-white p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 shadow-2xs max-w-sm">
-                    <p className="text-xs font-semibold text-slate-900">
-                      {selectedAccount?.name || 'Page Name'}
-                    </p>
-                    <p className="text-xs text-slate-700 whitespace-pre-wrap mt-0.5 leading-relaxed">
-                      {firstCommentContent}
-                    </p>
-                  </div>
+            return (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Live Mockup Preview
+                  </span>
+                  <span
+                    className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
+                      isInstagram
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                        : 'bg-blue-50 text-blue-700'
+                    }`}
+                  >
+                    {isInstagram ? 'Instagram Mobile Feed' : 'Facebook Desktop'}
+                  </span>
                 </div>
-              </div>
-            )}
 
-            {/* Planned Milestone Triggers Summary */}
-            {enableMilestones && milestones.length > 0 && (
-              <div className="p-3 bg-amber-50/50 border-t border-amber-100 text-[11px] space-y-1">
-                <span className="font-bold text-amber-900 flex items-center gap-1">
-                  <ThumbsUp className="w-3 h-3" /> Active Milestone Triggers:
-                </span>
-                {milestones.map((m) => (
-                  <p key={m.id} className="text-amber-800 text-[10px]">
-                    • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
-                  </p>
-                ))}
-              </div>
-            )}
+                {isInstagram ? (
+                  /* INSTAGRAM CARD MOCKUP */
+                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
+                    {/* IG Header */}
+                    <div className="p-3.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-9 w-9 rounded-full p-[1.5px] bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex-shrink-0">
+                          <div className="h-full w-full rounded-full bg-white p-[1px] overflow-hidden flex items-center justify-center font-bold text-xs">
+                            {selectedAccount?.avatar ? (
+                              <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover rounded-full" />
+                            ) : (
+                              <Instagram className="w-4 h-4 text-pink-600" />
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="font-bold text-xs text-slate-900 leading-tight">
+                            {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
+                          </p>
+                          <p className="text-[10px] text-slate-400">Sponsored · Original audio</p>
+                        </div>
+                      </div>
+                      <button type="button" className="text-slate-400 hover:text-slate-600">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
 
-            {/* Auto-Reply Summary */}
-            {enableAutoReply && autoReplyText.trim() && (
-              <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
-                <span className="font-bold text-violet-900 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> Auto-Reply to User Comments Active:
-                </span>
-                <p className="text-violet-800 text-[10px] mt-0.5">
-                  &quot;{autoReplyText.slice(0, 50)}...&quot;
-                </p>
-              </div>
-            )}
-          </div>
+                    {/* IG Media Viewport */}
+                    <div className="w-full bg-slate-950 aspect-square max-h-96 overflow-hidden flex items-center justify-center relative">
+                      {mediaUrl ? (
+                        mediaType === 'VIDEO' ? (
+                          <video src={mediaUrl} controls className="w-full h-full object-cover" />
+                        ) : (
+                          <img src={mediaUrl} alt="Instagram Post" className="w-full h-full object-cover" />
+                        )
+                      ) : (
+                        <div className="text-center p-6 text-slate-400 space-y-2">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-800 text-pink-400 flex items-center justify-center mx-auto">
+                            <Instagram className="w-6 h-6" />
+                          </div>
+                          <p className="text-xs font-medium text-slate-300">
+                            Attach an image or video to preview on Instagram
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            (Instagram requires media for all feed posts)
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* IG Actions */}
+                    <div className="px-3.5 pt-3 pb-1 flex items-center justify-between text-slate-800">
+                      <div className="flex items-center gap-4">
+                        <Heart className="w-5 h-5 hover:text-rose-500 cursor-pointer transition" />
+                        <MessageCircle className="w-5 h-5 hover:text-indigo-600 cursor-pointer transition" />
+                        <Send className="w-4 h-4 -rotate-45 hover:text-indigo-600 cursor-pointer transition" />
+                      </div>
+                      <Bookmark className="w-5 h-5 hover:text-slate-950 cursor-pointer transition" />
+                    </div>
+
+                    {/* Likes Count */}
+                    <div className="px-3.5 pt-1">
+                      <p className="text-xs font-bold text-slate-900">1,428 likes</p>
+                    </div>
+
+                    {/* IG Caption */}
+                    <div className="px-3.5 pt-1.5 pb-2 text-xs text-slate-800 leading-relaxed">
+                      <span className="font-bold mr-1.5 text-slate-900">
+                        {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
+                      </span>
+                      <span className="whitespace-pre-wrap">
+                        {content || 'Your post caption will appear here in real time...'}
+                      </span>
+                    </div>
+
+                    {/* IG First Comment (if enabled) */}
+                    {enableFirstComment && firstCommentContent.trim() && (
+                      <div className="px-3.5 py-2.5 border-t border-slate-100 bg-pink-50/40 text-xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 flex items-center gap-1 mb-1">
+                          <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
+                        </span>
+                        <p className="text-slate-800 leading-snug">
+                          <span className="font-bold mr-1.5 text-slate-900">
+                            {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
+                          </span>
+                          {firstCommentContent}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* View Comments count & Timestamp */}
+                    <div className="px-3.5 py-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+                      <span>View all 24 comments</span>
+                      <span>JUST NOW</span>
+                    </div>
+
+                    {/* Planned Milestone Triggers Summary */}
+                    {enableMilestones && milestones.length > 0 && (
+                      <div className="p-3 bg-amber-50/60 border-t border-amber-100 text-[11px] space-y-1">
+                        <span className="font-bold text-amber-900 flex items-center gap-1">
+                          <Heart className="w-3 h-3" /> Active Milestone Triggers:
+                        </span>
+                        {milestones.map((m) => (
+                          <p key={m.id} className="text-amber-800 text-[10px]">
+                            • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Auto-Reply Summary */}
+                    {enableAutoReply && autoReplyText.trim() && (
+                      <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
+                        <span className="font-bold text-violet-900 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Auto-Reply to User Comments Active:
+                        </span>
+                        <p className="text-violet-800 text-[10px] mt-0.5">
+                          &quot;{autoReplyText.slice(0, 50)}...&quot;
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Facebook Card Mockup */
+                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+                    {/* Header */}
+                    <div className="p-4 flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 overflow-hidden">
+                        {selectedAccount?.avatar ? (
+                          <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                        ) : (
+                          selectedAccount?.name?.slice(0, 2).toUpperCase() || 'FB'
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-slate-900 leading-snug truncate">
+                          {selectedAccount?.name || 'Your Facebook Page'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                          Just now · <Globe className="w-3 h-3 text-slate-400 inline" />
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Post Text */}
+                    <div className="px-4 pb-3">
+                      <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                        {content || 'Your post caption will appear here in real time...'}
+                      </p>
+                    </div>
+
+                    {/* Media Preview (Video or Image) */}
+                    {mediaUrl && (
+                      <div className="w-full bg-slate-900 max-h-80 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
+                        {mediaType === 'VIDEO' ? (
+                          <video src={mediaUrl} controls className="w-full max-h-80 object-cover" />
+                        ) : (
+                          <img src={mediaUrl} alt="Attachment" className="w-full object-cover max-h-80" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reaction bar */}
+                    <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-around text-slate-500 text-xs font-semibold">
+                      <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
+                        <ThumbsUp className="w-4 h-4" /> Like
+                      </span>
+                      <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
+                        <MessageCircle className="w-4 h-4" /> Comment
+                      </span>
+                      <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
+                        <Share2 className="w-4 h-4" /> Share
+                      </span>
+                    </div>
+
+                    {/* Auto First Comment Preview */}
+                    {enableFirstComment && firstCommentContent.trim() && (
+                      <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
+                        </span>
+
+                        <div className="flex items-start gap-2.5">
+                          <div className="h-7 w-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+                            {selectedAccount?.name?.slice(0, 1).toUpperCase() || 'P'}
+                          </div>
+                          <div className="bg-white p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 shadow-2xs max-w-sm">
+                            <p className="text-xs font-semibold text-slate-900">
+                              {selectedAccount?.name || 'Page Name'}
+                            </p>
+                            <p className="text-xs text-slate-700 whitespace-pre-wrap mt-0.5 leading-relaxed">
+                              {firstCommentContent}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Planned Milestone Triggers Summary */}
+                    {enableMilestones && milestones.length > 0 && (
+                      <div className="p-3 bg-amber-50/50 border-t border-amber-100 text-[11px] space-y-1">
+                        <span className="font-bold text-amber-900 flex items-center gap-1">
+                          <ThumbsUp className="w-3 h-3" /> Active Milestone Triggers:
+                        </span>
+                        {milestones.map((m) => (
+                          <p key={m.id} className="text-amber-800 text-[10px]">
+                            • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Auto-Reply Summary */}
+                    {enableAutoReply && autoReplyText.trim() && (
+                      <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
+                        <span className="font-bold text-violet-900 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Auto-Reply to User Comments Active:
+                        </span>
+                        <p className="text-violet-800 text-[10px] mt-0.5">
+                          &quot;{autoReplyText.slice(0, 50)}...&quot;
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

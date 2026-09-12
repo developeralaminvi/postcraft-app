@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { publishFacebookPost, publishFacebookComment } from '@/lib/facebook';
+import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 
 export async function POST(
   req: NextRequest,
@@ -27,19 +28,33 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    const publishRes = await publishFacebookPost({
-      pageId: post.account.accountId,
-      accessToken: post.account.accessToken,
-      message: post.content,
-      mediaUrl: post.mediaUrl,
-    });
+    const isInstagram = post.account.platform === 'INSTAGRAM';
+
+    let publishRes;
+    if (isInstagram) {
+      publishRes = await publishInstagramPost({
+        igUserId: post.account.accountId,
+        accessToken: post.account.accessToken,
+        caption: post.content,
+        mediaUrl: post.mediaUrl || '',
+        mediaType: (post.mediaType as any) || 'IMAGE',
+      });
+    } else {
+      publishRes = await publishFacebookPost({
+        pageId: post.account.accountId,
+        accessToken: post.account.accessToken,
+        message: post.content,
+        mediaUrl: post.mediaUrl,
+        mediaType: (post.mediaType as any) || 'TEXT',
+      });
+    }
 
     if (!publishRes.success || !publishRes.postId) {
       await prisma.post.update({
         where: { id: post.id },
         data: {
           status: 'FAILED',
-          errorMessage: publishRes.error || 'Failed to publish to Facebook',
+          errorMessage: publishRes.error || `Failed to publish to ${post.account.platform}`,
         },
       });
 
@@ -63,11 +78,20 @@ export async function POST(
     // Process attached comments
     for (const comment of post.comments) {
       if (comment.delayMinutes === 0) {
-        const commentRes = await publishFacebookComment({
-          postId: publishRes.postId,
-          accessToken: post.account.accessToken,
-          message: comment.content,
-        });
+        let commentRes;
+        if (isInstagram) {
+          commentRes = await publishInstagramComment({
+            mediaId: publishRes.postId,
+            accessToken: post.account.accessToken,
+            message: comment.content,
+          });
+        } else {
+          commentRes = await publishFacebookComment({
+            postId: publishRes.postId,
+            accessToken: post.account.accessToken,
+            message: comment.content,
+          });
+        }
 
         await prisma.comment.update({
           where: { id: comment.id },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { verifyFacebookPage } from '@/lib/facebook';
+import { verifyInstagramAccount } from '@/lib/instagram';
 
 export async function GET() {
   try {
@@ -46,21 +47,51 @@ export async function POST(req: NextRequest) {
 
     if (!pageId || !accessToken) {
       return NextResponse.json(
-        { error: 'Page ID and Page Access Token are required' },
+        { error: 'Account ID and Access Token are required' },
         { status: 400 }
       );
     }
 
-    // Verify token with Meta Graph API
-    const verification = await verifyFacebookPage(pageId.trim(), accessToken.trim());
-    if (!verification.success || !verification.data) {
-      return NextResponse.json(
-        { error: verification.error || 'Invalid Facebook Page credentials' },
-        { status: 400 }
-      );
-    }
+    let accountData: {
+      id: string;
+      name: string;
+      avatar?: string | null;
+      category?: string | null;
+      token: string;
+    };
 
-    const pageData = verification.data;
+    if (platform === 'INSTAGRAM') {
+      const verification = await verifyInstagramAccount(pageId.trim(), accessToken.trim());
+      if (!verification.success || !verification.data) {
+        return NextResponse.json(
+          { error: verification.error || 'Invalid Instagram credentials' },
+          { status: 400 }
+        );
+      }
+      accountData = {
+        id: verification.data.id,
+        name: `@${verification.data.username.replace(/^@/, '')}`,
+        avatar: verification.data.avatar,
+        category: 'Instagram Business',
+        token: verification.data.accessToken,
+      };
+    } else {
+      // Default: Facebook
+      const verification = await verifyFacebookPage(pageId.trim(), accessToken.trim());
+      if (!verification.success || !verification.data) {
+        return NextResponse.json(
+          { error: verification.error || 'Invalid Facebook Page credentials' },
+          { status: 400 }
+        );
+      }
+      accountData = {
+        id: verification.data.id,
+        name: verification.data.name,
+        avatar: verification.data.avatar,
+        category: verification.data.category,
+        token: verification.data.pageAccessToken,
+      };
+    }
 
     // Upsert the social account in database
     const account = await prisma.socialAccount.upsert({
@@ -68,24 +99,24 @@ export async function POST(req: NextRequest) {
         userId_platform_accountId: {
           userId: user.id,
           platform,
-          accountId: pageData.id,
+          accountId: accountData.id,
         },
       },
       update: {
-        name: pageData.name,
-        avatar: pageData.avatar,
-        category: pageData.category,
-        accessToken: pageData.pageAccessToken,
+        name: accountData.name,
+        avatar: accountData.avatar,
+        category: accountData.category,
+        accessToken: accountData.token,
         isActive: true,
       },
       create: {
         userId: user.id,
         platform,
-        accountId: pageData.id,
-        name: pageData.name,
-        avatar: pageData.avatar,
-        category: pageData.category,
-        accessToken: pageData.pageAccessToken,
+        accountId: accountData.id,
+        name: accountData.name,
+        avatar: accountData.avatar,
+        category: accountData.category,
+        accessToken: accountData.token,
         isActive: true,
       },
     });
@@ -100,7 +131,7 @@ export async function POST(req: NextRequest) {
         avatar: account.avatar,
         category: account.category,
       },
-      message: `Successfully connected Facebook Page: ${account.name}`,
+      message: `Successfully connected ${platform === 'INSTAGRAM' ? 'Instagram Account' : 'Facebook Page'}: ${account.name}`,
     });
   } catch (error: any) {
     console.error('Error connecting account:', error);
