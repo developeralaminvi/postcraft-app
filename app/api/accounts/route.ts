@@ -104,15 +104,14 @@ export async function POST(req: NextRequest) {
       };
     } else if (platform === 'WORDPRESS') {
       const siteUrl = pageId.trim();
-      let username = reqUsername || '';
-      let appPassword = reqAppPassword || '';
+      let username = (reqUsername || '').trim();
+      let appPassword = (reqAppPassword || accessToken || '').trim();
       if (!username && accessToken.includes(':::')) {
         const parts = accessToken.split(':::');
-        username = parts[0];
-        appPassword = parts.slice(1).join(':::');
+        username = parts[0].trim();
+        appPassword = parts.slice(1).join(':::').trim();
       } else if (!username) {
         username = 'admin';
-        appPassword = accessToken;
       }
 
       const verification = await verifyWordPressAccount(siteUrl, username, appPassword);

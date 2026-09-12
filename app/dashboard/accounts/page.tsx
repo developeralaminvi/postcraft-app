@@ -87,6 +87,7 @@ export default function AccountsPage() {
           pageId: pageId.trim(),
           accessToken: accessToken.trim(),
           username: wpUsername.trim(),
+          appPassword: accessToken.trim(),
         }),
       });
 
@@ -421,12 +422,18 @@ export default function AccountsPage() {
                           </h3>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              isPersonal
+                              acc.platform === 'WORDPRESS'
+                                ? 'bg-blue-50 text-[#21759B] border-blue-200'
+                                : isPersonal
                                 ? 'bg-purple-50 text-purple-700 border-purple-200'
                                 : 'bg-blue-50 text-blue-700 border-blue-200'
                             }`}
                           >
-                            {isPersonal ? '👤 Personal Profile' : '🏢 Page'}
+                            {acc.platform === 'WORDPRESS'
+                              ? '🌐 WordPress Site'
+                              : isPersonal
+                              ? '👤 Personal Profile'
+                              : '🏢 Page'}
                           </span>
                         </div>
                         <p className="text-xs text-slate-400 truncate mt-0.5">
