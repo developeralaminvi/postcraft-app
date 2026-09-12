@@ -22,6 +22,7 @@ import {
   Trash2,
   X,
   Instagram,
+  Linkedin,
   Heart,
   Bookmark,
   MoreHorizontal,
@@ -120,12 +121,14 @@ export default function CreatePostPage() {
     subtitle: string;
     avatar?: string;
     verified?: boolean;
-    platform: 'FACEBOOK' | 'INSTAGRAM' | 'ALL';
-    type: 'profile' | 'page' | 'audience' | 'custom';
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'ALL';
+    type: 'profile' | 'page' | 'company' | 'audience' | 'custom';
     followers?: string;
     bio?: string;
     postsCount?: string;
     followingCount?: string;
+    headline?: string;
+    connections?: string;
   }
 
   const DEFAULT_PROFILES: MentionProfile[] = [
@@ -237,6 +240,63 @@ export default function CreatePostPage() {
       bio: 'Exploring future tech, robotics, AI, and futuristic gadgets 🤖',
     },
 
+    // LinkedIn Members & Companies
+    {
+      id: 'li_1',
+      tag: '@SatyaNadella',
+      name: 'Satya Nadella',
+      subtitle: 'Chairman and CEO at Microsoft · 10M followers',
+      headline: 'Chairman and CEO at Microsoft',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+      verified: true,
+      platform: 'LINKEDIN',
+      type: 'profile',
+      followers: '10.2M followers',
+      connections: '1st',
+      bio: 'Chairman and CEO at Microsoft. Empowering every person and organization on the planet to achieve more.',
+    },
+    {
+      id: 'li_2',
+      tag: '@BillGates',
+      name: 'Bill Gates',
+      subtitle: 'Co-chair, Bill & Melinda Gates Foundation · 36M followers',
+      headline: 'Co-chair, Bill & Melinda Gates Foundation',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+      verified: true,
+      platform: 'LINKEDIN',
+      type: 'profile',
+      followers: '36.5M followers',
+      connections: '2nd',
+      bio: 'Co-chair of the Bill & Melinda Gates Foundation. Passionate about global health, education, and climate innovation.',
+    },
+    {
+      id: 'li_3',
+      tag: '@AlaminDev',
+      name: 'Alamin Developer',
+      subtitle: 'Full Stack AI Engineer & Creator of PostCraft · 12K followers',
+      headline: 'Full Stack AI Engineer | PostCraft Architect',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      verified: true,
+      platform: 'LINKEDIN',
+      type: 'profile',
+      followers: '12.4K followers',
+      connections: '1st',
+      bio: 'Building enterprise social automation systems, Next.js web applications, and AI workflows.',
+    },
+    {
+      id: 'li_4',
+      tag: '@Microsoft',
+      name: 'Microsoft',
+      subtitle: 'Computer Software · Redmond, WA · 21M followers',
+      headline: 'Software Development & Cloud Computing',
+      avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+      verified: true,
+      platform: 'LINKEDIN',
+      type: 'company',
+      followers: '21.8M followers',
+      bio: 'Our mission is to empower every person and every organization on the planet to achieve more.',
+    },
+
     // Broadcast Audience Tags
     {
       id: 'aud_1',
@@ -285,7 +345,7 @@ export default function CreatePostPage() {
 
   const [hoveredProfileData, setHoveredProfileData] = useState<{
     profile: MentionProfile;
-    platform: 'FACEBOOK' | 'INSTAGRAM';
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN';
     rect: { top: number; left: number };
   } | null>(null);
 
@@ -372,6 +432,7 @@ export default function CreatePostPage() {
   };
 
   const getFilteredSuggestions = (): MentionProfile[] => {
+    const isLinkedIn = selectedAccount?.platform === 'LINKEDIN';
     const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
     const q = mentionState.query.toLowerCase();
 
@@ -382,10 +443,10 @@ export default function CreatePostPage() {
         id: `acc_${acc.id}`,
         tag: `@${cleanHandle}`,
         name: acc.name,
-        subtitle: `Your Connected ${acc.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} Account`,
+        subtitle: `Your Connected ${acc.platform === 'LINKEDIN' ? 'LinkedIn' : acc.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} Account`,
         avatar: acc.avatar || undefined,
         verified: true,
-        platform: (acc.platform === 'INSTAGRAM' ? 'INSTAGRAM' : 'FACEBOOK') as any,
+        platform: acc.platform as any,
         type: 'page',
         followers: 'Active Page',
         bio: `Connected account on PostCraft`,
@@ -393,9 +454,12 @@ export default function CreatePostPage() {
     });
 
     // 2. Filter default profiles matching current platform
-    const platformProfiles = DEFAULT_PROFILES.filter(
-      (p) => p.platform === 'ALL' || (isInstagram ? p.platform === 'INSTAGRAM' : p.platform === 'FACEBOOK')
-    );
+    const platformProfiles = DEFAULT_PROFILES.filter((p) => {
+      if (p.platform === 'ALL') return true;
+      if (isLinkedIn) return p.platform === 'LINKEDIN';
+      if (isInstagram) return p.platform === 'INSTAGRAM';
+      return p.platform === 'FACEBOOK';
+    });
 
     const allProfiles = [...userConnectedAccounts, ...platformProfiles];
 
@@ -414,8 +478,8 @@ export default function CreatePostPage() {
           id: 'custom_search',
           tag: `@${q}`,
           name: q,
-          subtitle: `Tag @${q} on ${isInstagram ? 'Instagram' : 'Facebook'}`,
-          platform: isInstagram ? 'INSTAGRAM' : 'FACEBOOK',
+          subtitle: `Tag @${q} on ${isLinkedIn ? 'LinkedIn' : isInstagram ? 'Instagram' : 'Facebook'}`,
+          platform: isLinkedIn ? 'LINKEDIN' : isInstagram ? 'INSTAGRAM' : 'FACEBOOK',
           type: 'custom',
         });
       }
@@ -424,7 +488,7 @@ export default function CreatePostPage() {
     return list;
   };
 
-  const findProfileByTag = (tag: string, platform: 'FACEBOOK' | 'INSTAGRAM'): MentionProfile => {
+  const findProfileByTag = (tag: string, platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN'): MentionProfile => {
     const cleanTag = tag.trim().toLowerCase();
     const suggestions = getFilteredSuggestions();
     const found = suggestions.find((s) => s.tag.toLowerCase() === cleanTag);
@@ -435,13 +499,20 @@ export default function CreatePostPage() {
       id: `dynamic_${rawName}`,
       tag: tag.startsWith('@') ? tag : `@${tag}`,
       name: rawName,
-      subtitle: platform === 'INSTAGRAM' ? 'Instagram User · Followed by friends' : 'Facebook Profile · Active Now',
+      subtitle:
+        platform === 'LINKEDIN'
+          ? 'LinkedIn Member · 500+ connections'
+          : platform === 'INSTAGRAM'
+          ? 'Instagram User · Followed by friends'
+          : 'Facebook Profile · Active Now',
+      headline: platform === 'LINKEDIN' ? 'Industry Professional · Network Member' : undefined,
+      connections: platform === 'LINKEDIN' ? '1st' : undefined,
       avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
       verified: false,
       platform,
       type: 'profile',
       followers: '1.5K followers',
-      bio: `${tag} active on ${platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}`,
+      bio: `${tag} active on ${platform === 'LINKEDIN' ? 'LinkedIn' : platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}`,
       postsCount: '84',
       followingCount: '210',
     };
@@ -449,7 +520,7 @@ export default function CreatePostPage() {
 
   const renderFormattedTextWithMentions = (
     text: string,
-    platform: 'FACEBOOK' | 'INSTAGRAM' = 'FACEBOOK'
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' = 'FACEBOOK'
   ) => {
     if (!text) return null;
     const parts = text.split(/(@[a-zA-Z0-9_\.]+|{[a-zA-Z0-9_]+})/g);
@@ -478,7 +549,9 @@ export default function CreatePostPage() {
             }}
             onMouseLeave={() => setHoveredProfileData(null)}
             className={`font-semibold cursor-pointer transition inline-block ${
-              platform === 'INSTAGRAM'
+              platform === 'LINKEDIN'
+                ? 'text-[#0A66C2] hover:text-[#004182] bg-blue-50/70 hover:bg-blue-100 px-1 py-0.2 rounded'
+                : platform === 'INSTAGRAM'
                 ? 'text-sky-600 hover:text-sky-700 bg-sky-50/70 hover:bg-sky-100 px-1 py-0.2 rounded'
                 : 'text-blue-600 hover:text-blue-700 bg-blue-50/70 hover:bg-blue-100 px-1 py-0.2 rounded'
             }`}
@@ -493,21 +566,28 @@ export default function CreatePostPage() {
 
   const renderMentionDropdown = (field: 'content' | 'firstComment' | 'autoReply') => {
     if (!mentionState.isOpen || mentionState.targetField !== field) return null;
+    const isLinkedIn = selectedAccount?.platform === 'LINKEDIN';
     const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
     const suggestions = getFilteredSuggestions();
 
     return (
       <div className="absolute left-0 right-0 z-30 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-        {/* Header customized for Facebook or Instagram */}
+        {/* Header customized for Facebook, Instagram, or LinkedIn */}
         <div
           className={`p-3 border-b flex items-center justify-between ${
-            isInstagram
+            isLinkedIn
+              ? 'bg-blue-50/80 border-blue-200'
+              : isInstagram
               ? 'bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-600/10 border-pink-100'
               : 'bg-blue-50/70 border-blue-100'
           }`}
         >
           <div className="flex items-center gap-2">
-            {isInstagram ? (
+            {isLinkedIn ? (
+              <span className="p-1.5 rounded-lg bg-[#0A66C2] text-white flex items-center justify-center shadow-xs">
+                <Linkedin className="w-3.5 h-3.5" />
+              </span>
+            ) : isInstagram ? (
               <span className="p-1.5 rounded-lg bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white flex items-center justify-center shadow-xs">
                 <Instagram className="w-3.5 h-3.5" />
               </span>
@@ -518,10 +598,18 @@ export default function CreatePostPage() {
             )}
             <div>
               <p className="text-xs font-bold text-slate-900 leading-tight">
-                {isInstagram ? 'Instagram Profiles & Creators' : 'Facebook Profiles & Pages'}
+                {isLinkedIn
+                  ? 'LinkedIn Members & Companies'
+                  : isInstagram
+                  ? 'Instagram Profiles & Creators'
+                  : 'Facebook Profiles & Pages'}
               </p>
               <p className="text-[10px] text-slate-500">
-                {isInstagram ? 'Tagging sends direct notification to users' : 'Mentioning tags profiles and notifies them'}
+                {isLinkedIn
+                  ? 'Mentioning tags professionals and sends network notifications'
+                  : isInstagram
+                  ? 'Tagging sends direct notification to users'
+                  : 'Mentioning tags profiles and notifies them'}
               </p>
             </div>
           </div>
@@ -551,7 +639,9 @@ export default function CreatePostPage() {
                   insertMention(item.tag);
                 }}
                 className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition group cursor-pointer ${
-                  isInstagram
+                  isLinkedIn
+                    ? 'hover:bg-blue-50/60'
+                    : isInstagram
                     ? 'hover:bg-gradient-to-r hover:from-pink-50 hover:to-purple-50'
                     : 'hover:bg-[#F0F2F5]'
                 }`}
@@ -574,7 +664,11 @@ export default function CreatePostPage() {
                         }`}
                       />
                       {item.verified && !isInstagram && (
-                        <div className="absolute -bottom-0.5 -right-0.5 bg-blue-600 text-white rounded-full p-0.5 shadow-xs">
+                        <div
+                          className={`absolute -bottom-0.5 -right-0.5 text-white rounded-full p-0.5 shadow-xs ${
+                            isLinkedIn ? 'bg-[#0A66C2]' : 'bg-blue-600'
+                          }`}
+                        >
                           <CheckCircle2 className="w-2.5 h-2.5" />
                         </div>
                       )}
@@ -595,16 +689,25 @@ export default function CreatePostPage() {
                       <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
                         {isInstagram ? item.tag : item.name}
                       </p>
+                      {item.connections && (
+                        <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          {item.connections}
+                        </span>
+                      )}
                       {item.verified && (
                         <BadgeCheck
                           className={`w-3.5 h-3.5 flex-shrink-0 ${
-                            isInstagram ? 'text-sky-500 fill-sky-500 text-white' : 'text-blue-600 fill-blue-600 text-white'
+                            isLinkedIn
+                              ? 'text-[#0A66C2] fill-[#0A66C2] text-white'
+                              : isInstagram
+                              ? 'text-sky-500 fill-sky-500 text-white'
+                              : 'text-blue-600 fill-blue-600 text-white'
                           }`}
                         />
                       )}
                     </div>
                     <p className="text-[11px] text-slate-500 truncate">
-                      {isInstagram ? item.name : item.subtitle}
+                      {isLinkedIn && item.headline ? item.headline : isInstagram ? item.name : item.subtitle}
                     </p>
                   </div>
                 </div>
@@ -616,7 +719,9 @@ export default function CreatePostPage() {
                   </span>
                   <span
                     className={`text-[10px] font-bold px-2 py-1 rounded-lg transition ${
-                      isInstagram
+                      isLinkedIn
+                        ? 'bg-blue-100 text-[#0A66C2] group-hover:bg-[#0A66C2] group-hover:text-white'
+                        : isInstagram
                         ? 'bg-pink-100 text-pink-700 group-hover:bg-gradient-to-r group-hover:from-pink-500 group-hover:to-purple-600 group-hover:text-white'
                         : 'bg-blue-100 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
                     }`}
@@ -716,6 +821,7 @@ export default function CreatePostPage() {
     setSuccess(null);
 
     const targetAccount = accounts.find((a) => a.id === selectedAccountId);
+    const isLinkedIn = targetAccount?.platform === 'LINKEDIN';
     const isInstagram = targetAccount?.platform === 'INSTAGRAM';
 
     if (!selectedAccountId) {
@@ -772,7 +878,7 @@ export default function CreatePostPage() {
 
       setSuccess(
         publishMode === 'now'
-          ? `Post published to ${isInstagram ? 'Instagram' : 'Facebook'} successfully!`
+          ? `Post published to ${isLinkedIn ? 'LinkedIn' : isInstagram ? 'Instagram' : 'Facebook'} successfully!`
           : 'Post scheduled successfully!'
       );
 
@@ -822,7 +928,7 @@ export default function CreatePostPage() {
 
             {accounts.length === 0 ? (
               <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-                <span>No Facebook Page or Instagram Account connected yet.</span>
+                <span>No Facebook Page, Instagram, or LinkedIn Account connected yet.</span>
                 <a href="/dashboard/accounts" className="font-semibold underline text-amber-900">
                   Connect Account
                 </a>
@@ -835,7 +941,12 @@ export default function CreatePostPage() {
               >
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.platform === 'INSTAGRAM' ? '📸 Instagram' : '🌐 Facebook'}: {acc.name} ({acc.accountId})
+                    {acc.platform === 'LINKEDIN'
+                      ? '💼 LinkedIn'
+                      : acc.platform === 'INSTAGRAM'
+                      ? '📸 Instagram'
+                      : '🌐 Facebook'}
+                    : {acc.name} ({acc.accountId})
                   </option>
                 ))}
               </select>
@@ -1273,6 +1384,7 @@ export default function CreatePostPage() {
         {/* Right: Live Mockup Preview (5 cols) */}
         <div className="lg:col-span-5 sticky top-8 space-y-4">
           {(() => {
+            const isLinkedIn = selectedAccount?.platform === 'LINKEDIN';
             const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
 
             return (
@@ -1283,16 +1395,163 @@ export default function CreatePostPage() {
                   </span>
                   <span
                     className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
-                      isInstagram
+                      isLinkedIn
+                        ? 'bg-[#0A66C2] text-white'
+                        : isInstagram
                         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
                         : 'bg-blue-50 text-blue-700'
                     }`}
                   >
-                    {isInstagram ? 'Instagram Mobile Feed' : 'Facebook Desktop'}
+                    {isLinkedIn
+                      ? 'LinkedIn Desktop Feed'
+                      : isInstagram
+                      ? 'Instagram Mobile Feed'
+                      : 'Facebook Desktop'}
                   </span>
                 </div>
 
-                {isInstagram ? (
+                {isLinkedIn ? (
+                  /* LINKEDIN DESKTOP FEED MOCKUP */
+                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
+                    {/* LinkedIn Header */}
+                    <div className="p-4 flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="h-11 w-11 rounded-full bg-[#0A66C2] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 overflow-hidden">
+                          {selectedAccount?.avatar ? (
+                            <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover" />
+                          ) : (
+                            <Linkedin className="w-5 h-5" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-sm text-slate-900 truncate">
+                              {selectedAccount?.name || 'LinkedIn Member'}
+                            </span>
+                            <span className="text-slate-400 text-xs font-normal">• 1st</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate leading-tight">
+                            Full Stack AI Engineer | PostCraft Architect · Creator
+                          </p>
+                          <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            Just now • Edited • <Globe className="w-3 h-3 text-slate-400 inline" />
+                          </p>
+                        </div>
+                      </div>
+
+                      <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* LinkedIn Commentary / Text */}
+                    <div className="px-4 pb-3">
+                      <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                        {renderFormattedTextWithMentions(
+                          content || 'Your LinkedIn post commentary will appear here in real time...',
+                          'LINKEDIN'
+                        )}
+                      </div>
+                    </div>
+
+                    {/* LinkedIn Media Viewport */}
+                    {mediaUrl && (
+                      <div className="w-full bg-slate-950 max-h-84 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
+                        {mediaType === 'VIDEO' ? (
+                          <video src={mediaUrl} controls className="w-full max-h-84 object-cover" />
+                        ) : (
+                          <img src={mediaUrl} alt="LinkedIn Post Media" className="w-full object-cover max-h-84" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* LinkedIn Engagement Counts Bar */}
+                    <div className="px-4 py-2 flex items-center justify-between text-[11px] text-slate-500 border-b border-slate-100">
+                      <div className="flex items-center gap-1">
+                        <span className="flex items-center -space-x-1">
+                          <span className="h-4 w-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] shadow-2xs">👍</span>
+                          <span className="h-4 w-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] shadow-2xs">💡</span>
+                          <span className="h-4 w-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] shadow-2xs">❤️</span>
+                        </span>
+                        <span className="hover:text-[#0A66C2] hover:underline cursor-pointer ml-1">54</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="hover:text-[#0A66C2] hover:underline cursor-pointer">18 comments</span>
+                        <span>•</span>
+                        <span className="hover:text-[#0A66C2] hover:underline cursor-pointer">5 reposts</span>
+                      </div>
+                    </div>
+
+                    {/* LinkedIn Actions */}
+                    <div className="px-2 py-1 flex items-center justify-around text-slate-600 text-xs font-semibold">
+                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                        <ThumbsUp className="w-4 h-4" /> Like
+                      </button>
+                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                        <MessageCircle className="w-4 h-4" /> Comment
+                      </button>
+                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                        <Share2 className="w-4 h-4" /> Repost
+                      </button>
+                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                        <Send className="w-4 h-4" /> Send
+                      </button>
+                    </div>
+
+                    {/* LinkedIn First Comment (if enabled) */}
+                    {enableFirstComment && firstCommentContent.trim() && (
+                      <div className="p-4 bg-slate-50/70 border-t border-slate-100 space-y-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0A66C2] flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
+                        </span>
+
+                        <div className="flex items-start gap-2.5">
+                          <div className="h-8 w-8 rounded-full bg-[#0A66C2] text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                            {selectedAccount?.name?.slice(0, 1).toUpperCase() || 'L'}
+                          </div>
+                          <div className="bg-slate-100 p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 flex-1 max-w-sm">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-bold text-slate-900">
+                                {selectedAccount?.name || 'Member Name'}
+                              </p>
+                              <span className="text-[10px] text-slate-400">Author</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500">Software Architect</p>
+                            <div className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">
+                              {renderFormattedTextWithMentions(firstCommentContent, 'LINKEDIN')}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Milestone Triggers Summary */}
+                    {enableMilestones && milestones.length > 0 && (
+                      <div className="p-3 bg-amber-50/50 border-t border-amber-100 text-[11px] space-y-1">
+                        <span className="font-bold text-amber-900 flex items-center gap-1">
+                          <ThumbsUp className="w-3 h-3 text-amber-600" /> Active LinkedIn Milestone Triggers:
+                        </span>
+                        {milestones.map((m) => (
+                          <p key={m.id} className="text-amber-800 text-[10px]">
+                            • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Auto-Reply Summary */}
+                    {enableAutoReply && autoReplyText.trim() && (
+                      <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
+                        <span className="font-bold text-violet-900 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-violet-600" /> Auto-Reply to LinkedIn Comments Active:
+                        </span>
+                        <p className="text-violet-800 text-[10px] mt-0.5">
+                          &quot;{autoReplyText.slice(0, 50)}...&quot;
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : isInstagram ? (
                   /* INSTAGRAM CARD MOCKUP */
                   <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
                     {/* IG Header */}
@@ -1532,7 +1791,67 @@ export default function CreatePostPage() {
             left: Math.max(12, hoveredProfileData.rect.left - 60),
           }}
         >
-          {hoveredProfileData.platform === 'INSTAGRAM' ? (
+          {hoveredProfileData.platform === 'LINKEDIN' ? (
+            /* LinkedIn Profile Card */
+            <div className="w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden pointer-events-auto">
+              <div className="h-14 bg-gradient-to-r from-[#0A66C2] to-[#004182] relative"></div>
+              <div className="px-4 pb-4 pt-0 space-y-2.5 relative">
+                <div className="-mt-7 flex items-end justify-between">
+                  <div className="relative">
+                    <img
+                      src={hoveredProfileData.profile.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                      alt="Avatar"
+                      className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md bg-white"
+                    />
+                    {hoveredProfileData.profile.verified && (
+                      <div className="absolute bottom-0 right-0 bg-[#0A66C2] text-white rounded-full p-0.5 shadow-xs">
+                        <CheckCircle2 className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-[#0A66C2] border border-blue-200">
+                    {hoveredProfileData.profile.connections ? `${hoveredProfileData.profile.connections} Connection` : 'LinkedIn Network'}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="font-bold text-sm text-slate-900 truncate">{hoveredProfileData.profile.name}</p>
+                    {hoveredProfileData.profile.verified && (
+                      <BadgeCheck className="w-3.5 h-3.5 text-[#0A66C2] fill-[#0A66C2] text-white flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium line-clamp-2 leading-tight mt-0.5">
+                    {hoveredProfileData.profile.headline || hoveredProfileData.profile.subtitle}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {hoveredProfileData.profile.followers || '500+ connections'}
+                  </p>
+                </div>
+
+                {hoveredProfileData.profile.bio && (
+                  <p className="text-xs text-slate-600 leading-snug line-clamp-2">
+                    {hoveredProfileData.profile.bio}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                  <button
+                    type="button"
+                    className="flex-1 py-1.5 rounded-full bg-[#0A66C2] hover:bg-[#004182] text-white font-semibold text-xs flex items-center justify-center gap-1 transition shadow-xs cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Connect
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 py-1.5 rounded-full border border-[#0A66C2] text-[#0A66C2] hover:bg-blue-50 font-semibold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <Send className="w-3 h-3" /> Message
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : hoveredProfileData.platform === 'INSTAGRAM' ? (
             /* Instagram Profile Card */
             <div className="w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 pointer-events-auto">
               <div className="flex items-center gap-3">

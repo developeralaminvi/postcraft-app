@@ -13,7 +13,9 @@ import {
   MessageSquare,
   PenSquare,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Linkedin,
+  Instagram
 } from 'lucide-react';
 
 interface Comment {
@@ -197,7 +199,9 @@ export default function PostsPage() {
                   <div className="flex items-center gap-3">
                     <div
                       className={`h-10 w-10 rounded-xl text-white flex items-center justify-center font-bold text-xs flex-shrink-0 overflow-hidden ${
-                        post.account.platform === 'INSTAGRAM'
+                        post.account.platform === 'LINKEDIN'
+                          ? 'bg-[#0A66C2]'
+                          : post.account.platform === 'INSTAGRAM'
                           ? 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600'
                           : 'bg-blue-600'
                       }`}
@@ -208,6 +212,10 @@ export default function PostsPage() {
                           alt="Avatar"
                           className="h-full w-full object-cover"
                         />
+                      ) : post.account.platform === 'LINKEDIN' ? (
+                        <Linkedin className="w-5 h-5" />
+                      ) : post.account.platform === 'INSTAGRAM' ? (
+                        <Instagram className="w-5 h-5" />
                       ) : (
                         post.account.name.slice(0, 2).toUpperCase()
                       )}
@@ -219,7 +227,9 @@ export default function PostsPage() {
                         </span>
                         <span
                           className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                            post.account.platform === 'INSTAGRAM'
+                            post.account.platform === 'LINKEDIN'
+                              ? 'bg-blue-50 text-[#0A66C2] border-blue-200'
+                              : post.account.platform === 'INSTAGRAM'
                               ? 'bg-pink-50 text-pink-700 border-pink-200'
                               : 'bg-blue-50 text-blue-700 border-blue-200'
                           }`}
@@ -271,7 +281,7 @@ export default function PostsPage() {
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" /> View on {post.account.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
+                        <ExternalLink className="w-3.5 h-3.5" /> View on {post.account.platform === 'LINKEDIN' ? 'LinkedIn' : post.account.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
                       </a>
                     )}
 
@@ -288,17 +298,6 @@ export default function PostsPage() {
                         )}
                         Publish Now
                       </button>
-                    )}
-
-                    {post.platformPostUrl && (
-                      <a
-                        href={post.platformPostUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition"
-                      >
-                        Facebook <ExternalLink className="w-3 h-3" />
-                      </a>
                     )}
 
                     <button

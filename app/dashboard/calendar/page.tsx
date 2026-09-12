@@ -17,7 +17,8 @@ import {
   ExternalLink,
   X,
   ThumbsUp,
-  Instagram
+  Instagram,
+  Linkedin
 } from 'lucide-react';
 
 interface Milestone {
@@ -248,7 +249,11 @@ export default function CalendarPage() {
                       >
                         <div className="flex items-center justify-between gap-1 text-[10px] font-semibold mb-0.5">
                           <span className="truncate flex items-center gap-1">
-                            {post.account?.platform === 'INSTAGRAM' ? (
+                            {post.account?.platform === 'LINKEDIN' ? (
+                              <span className="p-0.5 rounded bg-[#0A66C2] text-white inline-flex items-center justify-center">
+                                <Linkedin className="w-2.5 h-2.5" />
+                              </span>
+                            ) : post.account?.platform === 'INSTAGRAM' ? (
                               <span className="p-0.5 rounded bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white inline-flex items-center justify-center">
                                 <Instagram className="w-2.5 h-2.5" />
                               </span>
@@ -282,7 +287,11 @@ export default function CalendarPage() {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                {selectedPost.account?.platform === 'INSTAGRAM' ? (
+                {selectedPost.account?.platform === 'LINKEDIN' ? (
+                  <span className="p-1 rounded-lg bg-[#0A66C2] text-white flex items-center justify-center">
+                    <Linkedin className="w-3.5 h-3.5" />
+                  </span>
+                ) : selectedPost.account?.platform === 'INSTAGRAM' ? (
                   <span className="p-1 rounded-lg bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white flex items-center justify-center">
                     <Instagram className="w-3.5 h-3.5" />
                   </span>
@@ -395,12 +404,16 @@ export default function CalendarPage() {
                   target="_blank"
                   rel="noreferrer"
                   className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-white text-xs font-semibold transition ${
-                    selectedPost.account?.platform === 'INSTAGRAM'
+                    selectedPost.account?.platform === 'LINKEDIN'
+                      ? 'bg-[#0A66C2] hover:bg-[#004182]'
+                      : selectedPost.account?.platform === 'INSTAGRAM'
                       ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:opacity-90'
                       : 'bg-blue-600 hover:bg-blue-700'
                   }`}
                 >
-                  {selectedPost.account?.platform === 'INSTAGRAM'
+                  {selectedPost.account?.platform === 'LINKEDIN'
+                    ? 'View Live on LinkedIn'
+                    : selectedPost.account?.platform === 'INSTAGRAM'
                     ? 'View Live on Instagram'
                     : 'View Live on Facebook'}{' '}
                   <ExternalLink className="w-3.5 h-3.5" />

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { verifyFacebookPage } from '@/lib/facebook';
 import { verifyInstagramAccount } from '@/lib/instagram';
+import { verifyLinkedInAccount } from '@/lib/linkedin';
 
 export async function GET() {
   try {
@@ -60,7 +61,22 @@ export async function POST(req: NextRequest) {
       token: string;
     };
 
-    if (platform === 'INSTAGRAM') {
+    if (platform === 'LINKEDIN') {
+      const verification = await verifyLinkedInAccount(pageId.trim(), accessToken.trim());
+      if (!verification.success || !verification.data) {
+        return NextResponse.json(
+          { error: verification.error || 'Invalid LinkedIn credentials' },
+          { status: 400 }
+        );
+      }
+      accountData = {
+        id: verification.data.id,
+        name: verification.data.name,
+        avatar: verification.data.avatar,
+        category: verification.data.isOrganization ? 'LinkedIn Company Page' : 'LinkedIn Member Profile',
+        token: verification.data.accessToken,
+      };
+    } else if (platform === 'INSTAGRAM') {
       const verification = await verifyInstagramAccount(pageId.trim(), accessToken.trim());
       if (!verification.success || !verification.data) {
         return NextResponse.json(

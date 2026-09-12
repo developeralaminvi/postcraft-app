@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Share2,
   Instagram,
+  Linkedin,
   Plus,
   Trash2,
   CheckCircle2,
@@ -30,7 +31,7 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [platform, setPlatform] = useState<'FACEBOOK' | 'INSTAGRAM'>('FACEBOOK');
+  const [platform, setPlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN'>('FACEBOOK');
   const [pageId, setPageId] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -103,7 +104,10 @@ export default function AccountsPage() {
   };
 
   const fillSimulatedDemo = () => {
-    if (platform === 'INSTAGRAM') {
+    if (platform === 'LINKEDIN') {
+      setPageId('urn:li:person:TEST_LI_' + Math.floor(1000 + Math.random() * 9000));
+      setAccessToken('TEST_LINKEDIN_TOKEN_SIMULATED');
+    } else if (platform === 'INSTAGRAM') {
       setPageId('TEST_IG_' + Math.floor(1000 + Math.random() * 9000));
       setAccessToken('TEST_INSTAGRAM_TOKEN_SIMULATED');
     } else {
@@ -118,7 +122,7 @@ export default function AccountsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Connected Accounts</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Connect your Facebook Pages &amp; Instagram Business accounts to schedule posts and automate comments.
+          Connect your Facebook Pages, Instagram Business, and LinkedIn accounts to schedule posts and automate comments.
         </p>
       </div>
 
@@ -148,18 +152,18 @@ export default function AccountsPage() {
             <button
               type="button"
               onClick={() => setPlatform('FACEBOOK')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition ${
                 platform === 'FACEBOOK'
                   ? 'bg-white text-blue-600 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Share2 className="w-3.5 h-3.5" /> Facebook Page
+              <Share2 className="w-3.5 h-3.5" /> Facebook
             </button>
             <button
               type="button"
               onClick={() => setPlatform('INSTAGRAM')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition ${
                 platform === 'INSTAGRAM'
                   ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -167,12 +171,23 @@ export default function AccountsPage() {
             >
               <Instagram className="w-3.5 h-3.5" /> Instagram
             </button>
+            <button
+              type="button"
+              onClick={() => setPlatform('LINKEDIN')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition ${
+                platform === 'LINKEDIN'
+                  ? 'bg-[#0A66C2] text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Linkedin className="w-3.5 h-3.5" /> LinkedIn
+            </button>
           </div>
 
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-base text-slate-900 flex items-center gap-2">
               <Plus className="w-4 h-4 text-indigo-600" />
-              Connect {platform === 'INSTAGRAM' ? 'Instagram Business' : 'Facebook Page'}
+              Connect {platform === 'LINKEDIN' ? 'LinkedIn Profile / Page' : platform === 'INSTAGRAM' ? 'Instagram Business' : 'Facebook Page'}
             </h2>
             <button
               type="button"
@@ -186,28 +201,38 @@ export default function AccountsPage() {
           <form onSubmit={handleConnect} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                {platform === 'INSTAGRAM' ? 'Instagram Business ID' : 'Facebook Page ID'}
+                {platform === 'LINKEDIN' ? 'LinkedIn Member URN / Org ID' : platform === 'INSTAGRAM' ? 'Instagram Business ID' : 'Facebook Page ID'}
               </label>
               <input
                 type="text"
                 required
                 value={pageId}
                 onChange={(e) => setPageId(e.target.value)}
-                placeholder={platform === 'INSTAGRAM' ? 'e.g. 17841405309214589' : 'e.g. 102938475610293'}
+                placeholder={
+                  platform === 'LINKEDIN'
+                    ? 'urn:li:person:... or urn:li:organization:...'
+                    : platform === 'INSTAGRAM'
+                    ? 'e.g. 17841405309214589'
+                    : 'e.g. 102938475610293'
+                }
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition font-mono text-xs"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                {platform === 'INSTAGRAM' ? 'Meta Graph API Access Token' : 'Page Access Token'}
+                {platform === 'LINKEDIN' ? 'LinkedIn OAuth 2.0 Access Token' : platform === 'INSTAGRAM' ? 'Meta Graph API Access Token' : 'Page Access Token'}
               </label>
               <textarea
                 required
                 rows={3}
                 value={accessToken}
                 onChange={(e) => setAccessToken(e.target.value)}
-                placeholder="EAAG... (Graph API Token with instagram_content_publish / pages_manage_posts)"
+                placeholder={
+                  platform === 'LINKEDIN'
+                    ? 'AQ... (LinkedIn Access Token with w_member_social or w_organization_social)'
+                    : 'EAAG... (Graph API Token with instagram_content_publish / pages_manage_posts)'
+                }
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition font-mono text-xs"
               />
             </div>
@@ -216,7 +241,9 @@ export default function AccountsPage() {
               type="submit"
               disabled={submitting}
               className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-white text-sm font-semibold shadow-sm transition disabled:opacity-50 ${
-                platform === 'INSTAGRAM'
+                platform === 'LINKEDIN'
+                  ? 'bg-[#0A66C2] hover:bg-[#004182]'
+                  : platform === 'INSTAGRAM'
                   ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-95'
                   : 'bg-indigo-600 hover:bg-indigo-700'
               }`}
@@ -227,7 +254,7 @@ export default function AccountsPage() {
                 </>
               ) : (
                 <>
-                  Connect {platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook Page'}
+                  Connect {platform === 'LINKEDIN' ? 'LinkedIn' : platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook Page'}
                 </>
               )}
             </button>
@@ -238,7 +265,7 @@ export default function AccountsPage() {
               className="w-full py-2 px-3 rounded-xl border border-dashed border-indigo-200 text-xs text-indigo-700 font-medium hover:bg-indigo-50/50 flex items-center justify-center gap-1.5 transition"
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              Use Simulated {platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} (Instant Test)
+              Use Simulated {platform === 'LINKEDIN' ? 'LinkedIn' : platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} (Instant Test)
             </button>
           </form>
 
@@ -246,7 +273,15 @@ export default function AccountsPage() {
           {showGuide && (
             <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-2 leading-relaxed">
               <p className="font-bold text-slate-900">How to get {platform} credentials:</p>
-              {platform === 'INSTAGRAM' ? (
+              {platform === 'LINKEDIN' ? (
+                <ol className="list-decimal pl-4 space-y-1.5">
+                  <li>Go to <a href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer" className="text-blue-600 underline inline-flex items-center gap-0.5">LinkedIn Developer Portal <ExternalLink className="w-2.5 h-2.5" /></a> and create an app.</li>
+                  <li>Under <strong>Products</strong>, add <em>Share on LinkedIn</em> and <em>Sign In with LinkedIn using OpenID Connect</em>.</li>
+                  <li>Request scopes: <code className="bg-slate-200 px-1 rounded text-[11px]">w_member_social</code> and/or <code className="bg-slate-200 px-1 rounded text-[11px]">openid, profile</code> (or <code className="bg-slate-200 px-1 rounded text-[11px]">w_organization_social</code> for organization pages).</li>
+                  <li>Generate an OAuth 2.0 User Access Token using the OAuth token generator or your app redirect flow.</li>
+                  <li>Provide your Person URN (<code className="bg-slate-200 px-1 rounded text-[11px]">urn:li:person:...</code>) or Organization URN (<code className="bg-slate-200 px-1 rounded text-[11px]">urn:li:organization:...</code>).</li>
+                </ol>
+              ) : platform === 'INSTAGRAM' ? (
                 <ol className="list-decimal pl-4 space-y-1.5">
                   <li>Ensure your Instagram account is switched to a <strong>Professional (Business/Creator)</strong> account.</li>
                   <li>Link your Instagram account to your Facebook Page in Facebook Page Settings.</li>
@@ -284,13 +319,14 @@ export default function AccountsPage() {
               </div>
               <p className="text-sm font-semibold text-slate-800">No Social Accounts Connected</p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                Connect a Facebook Page or Instagram Business account using the form on the left or try the simulated test mode.
+                Connect a Facebook Page, Instagram Business, or LinkedIn account using the form on the left or try the simulated test mode.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
               {accounts.map((acc) => {
                 const isIG = acc.platform === 'INSTAGRAM';
+                const isLI = acc.platform === 'LINKEDIN';
 
                 return (
                   <div
@@ -300,13 +336,17 @@ export default function AccountsPage() {
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div
                         className={`h-11 w-11 rounded-xl text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 overflow-hidden ${
-                          isIG
+                          isLI
+                            ? 'bg-[#0A66C2]'
+                            : isIG
                             ? 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600'
                             : 'bg-blue-600'
                         }`}
                       >
                         {acc.avatar ? (
                           <img src={acc.avatar} alt={acc.name} className="h-full w-full object-cover" />
+                        ) : isLI ? (
+                          <Linkedin className="w-5 h-5" />
                         ) : isIG ? (
                           <Instagram className="w-5 h-5" />
                         ) : (
@@ -320,7 +360,9 @@ export default function AccountsPage() {
                           </h3>
                           <span
                             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                              isIG
+                              isLI
+                                ? 'bg-blue-50 text-[#0A66C2] border-blue-200'
+                                : isIG
                                 ? 'bg-pink-50 text-pink-700 border-pink-100'
                                 : 'bg-blue-50 text-blue-700 border-blue-100'
                             }`}

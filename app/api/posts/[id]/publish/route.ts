@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
 import { publishFacebookPost, publishFacebookComment } from '@/lib/facebook';
 import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
+import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
 
 export async function POST(
   req: NextRequest,
@@ -28,10 +29,18 @@ export async function POST(
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    const isInstagram = post.account.platform === 'INSTAGRAM';
-
+    const platform = post.account.platform;
     let publishRes;
-    if (isInstagram) {
+
+    if (platform === 'LINKEDIN') {
+      publishRes = await publishLinkedInPost({
+        authorUrn: post.account.accountId,
+        accessToken: post.account.accessToken,
+        commentary: post.content,
+        mediaUrl: post.mediaUrl,
+        mediaType: post.mediaType as any,
+      });
+    } else if (platform === 'INSTAGRAM') {
       publishRes = await publishInstagramPost({
         igUserId: post.account.accountId,
         accessToken: post.account.accessToken,
@@ -79,7 +88,13 @@ export async function POST(
     for (const comment of post.comments) {
       if (comment.delayMinutes === 0) {
         let commentRes;
-        if (isInstagram) {
+        if (platform === 'LINKEDIN') {
+          commentRes = await publishLinkedInComment({
+            postUrn: publishRes.postId,
+            accessToken: post.account.accessToken,
+            message: comment.content,
+          });
+        } else if (platform === 'INSTAGRAM') {
           commentRes = await publishInstagramComment({
             mediaId: publishRes.postId,
             accessToken: post.account.accessToken,

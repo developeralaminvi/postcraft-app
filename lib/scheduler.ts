@@ -13,6 +13,13 @@ import {
   getInstagramRecentComments,
   replyToInstagramComment,
 } from './instagram';
+import {
+  publishLinkedInPost,
+  publishLinkedInComment,
+  getLinkedInEngagement,
+  getLinkedInRecentComments,
+  replyToLinkedInComment,
+} from './linkedin';
 
 /**
  * Process all scheduled posts that are due for publishing
@@ -43,10 +50,18 @@ export async function processDuePosts() {
         data: { status: 'PUBLISHING' },
       });
 
-      const isInstagram = post.account.platform === 'INSTAGRAM';
+      const platform = post.account.platform;
 
       let publishResult;
-      if (isInstagram) {
+      if (platform === 'LINKEDIN') {
+        publishResult = await publishLinkedInPost({
+          authorUrn: post.account.accountId,
+          accessToken: post.account.accessToken,
+          commentary: post.content,
+          mediaUrl: post.mediaUrl,
+          mediaType: post.mediaType as any,
+        });
+      } else if (platform === 'INSTAGRAM') {
         publishResult = await publishInstagramPost({
           igUserId: post.account.accountId,
           accessToken: post.account.accessToken,
@@ -91,7 +106,13 @@ export async function processDuePosts() {
       for (const comment of post.comments) {
         if (comment.delayMinutes === 0) {
           let commentResult;
-          if (isInstagram) {
+          if (platform === 'LINKEDIN') {
+            commentResult = await publishLinkedInComment({
+              postUrn: publishResult.postId,
+              accessToken: post.account.accessToken,
+              message: comment.content,
+            });
+          } else if (platform === 'INSTAGRAM') {
             commentResult = await publishInstagramComment({
               mediaId: publishResult.postId,
               accessToken: post.account.accessToken,
@@ -175,9 +196,15 @@ export async function processDueComments() {
         continue;
       }
 
-      const isInstagram = parentPost.account.platform === 'INSTAGRAM';
+      const platform = parentPost.account.platform;
       let commentResult;
-      if (isInstagram) {
+      if (platform === 'LINKEDIN') {
+        commentResult = await publishLinkedInComment({
+          postUrn: parentPost.platformPostId,
+          accessToken: parentPost.account.accessToken,
+          message: comment.content,
+        });
+      } else if (platform === 'INSTAGRAM') {
         commentResult = await publishInstagramComment({
           mediaId: parentPost.platformPostId,
           accessToken: parentPost.account.accessToken,
@@ -256,11 +283,18 @@ export async function processMilestoneTriggers() {
     if (!post.platformPostId) continue;
 
     try {
-      const isInstagram = post.account.platform === 'INSTAGRAM';
+      const platform = post.account.platform;
       let reactionsCount = 0;
       let commentsCount = 0;
 
-      if (isInstagram) {
+      if (platform === 'LINKEDIN') {
+        const stats = await getLinkedInEngagement(
+          post.platformPostId,
+          post.account.accessToken
+        );
+        reactionsCount = stats.reactionsCount;
+        commentsCount = stats.commentsCount;
+      } else if (platform === 'INSTAGRAM') {
         const stats = await getInstagramEngagement(
           post.platformPostId,
           post.account.accessToken
@@ -298,7 +332,13 @@ export async function processMilestoneTriggers() {
 
         if (shouldTrigger) {
           let commentResult;
-          if (isInstagram) {
+          if (platform === 'LINKEDIN') {
+            commentResult = await publishLinkedInComment({
+              postUrn: post.platformPostId,
+              accessToken: post.account.accessToken,
+              message: milestone.commentText,
+            });
+          } else if (platform === 'INSTAGRAM') {
             commentResult = await publishInstagramComment({
               mediaId: post.platformPostId,
               accessToken: post.account.accessToken,
@@ -402,10 +442,16 @@ export async function processAutoReplies() {
     if (!post.platformPostId || !post.autoReply?.isEnabled) continue;
 
     try {
-      const isInstagram = post.account.platform === 'INSTAGRAM';
+      const platform = post.account.platform;
       let recentComments: Array<{ id: string; message: string; fromId?: string; fromName?: string }> = [];
 
-      if (isInstagram) {
+      if (platform === 'LINKEDIN') {
+        recentComments = await getLinkedInRecentComments(
+          post.platformPostId,
+          post.account.accessToken,
+          post.account.accountId
+        );
+      } else if (platform === 'INSTAGRAM') {
         recentComments = await getInstagramRecentComments(
           post.platformPostId,
           post.account.accessToken,
@@ -429,12 +475,19 @@ export async function processAutoReplies() {
         const personalizedMessage = formatPersonalizedReply(
           post.autoReply.replyText,
           comment.fromName,
-          isInstagram
+          platform === 'INSTAGRAM'
         );
 
         // Reply to user comment
         let replyRes;
-        if (isInstagram) {
+        if (platform === 'LINKEDIN') {
+          replyRes = await replyToLinkedInComment({
+            postUrn: post.platformPostId,
+            commentUrn: comment.id,
+            accessToken: post.account.accessToken,
+            message: personalizedMessage,
+          });
+        } else if (platform === 'INSTAGRAM') {
           replyRes = await replyToInstagramComment({
             commentId: comment.id,
             accessToken: post.account.accessToken,
