@@ -120,6 +120,31 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white py-10 text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xs">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <span className="font-semibold text-slate-700">PostCraft</span>
+            <span>• © {new Date().getFullYear()} All rights reserved.</span>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <Link href="/privacy" className="hover:text-indigo-600 transition">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-indigo-600 transition">
+              Terms of Service
+            </Link>
+            <Link href="/data-deletion" className="hover:text-indigo-600 transition">
+              User Data Deletion
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

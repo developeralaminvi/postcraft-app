@@ -18,6 +18,7 @@ import {
   Key,
   Hash,
   HelpCircle,
+  Shield,
 } from 'lucide-react';
 
 interface Account {
@@ -581,6 +582,27 @@ export default function AccountsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Developer Privacy Policy & Terms Link */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-indigo-900 mt-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    অ্যাপ তৈরির সময় <strong>Privacy Policy URL</strong> চাইলে দিন:{' '}
+                    <code className="bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono font-bold">
+                      /privacy
+                    </code>
+                  </span>
+                </div>
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1"
+                >
+                  পলিসি পেজ দেখুন <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
 
             {/* Modal Footer */}
