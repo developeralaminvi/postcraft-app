@@ -87,6 +87,7 @@ export default function CreatePostPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'MASTER' | string>('MASTER');
+  const [composerMode, setComposerMode] = useState<'SOCIAL' | 'WORDPRESS'>('SOCIAL');
 
   // Master Post States
   const [masterTitle, setMasterTitle] = useState('');
@@ -403,12 +404,36 @@ export default function CreatePostPage() {
   } | null>(null);
 
   // Active Tab & Customization Helpers
+  const wpAccounts = accounts.filter((a) => a.platform === 'WORDPRESS');
+  const socialAccounts = accounts.filter((a) => a.platform !== 'WORDPRESS');
+
   const isMaster = activeTab === 'MASTER';
   const activeAccount = accounts.find((a) => a.id === activeTab) || null;
 
-  const isWordPressActive = isMaster
-    ? accounts.some((a) => selectedAccountIds.includes(a.id) && a.platform === 'WORDPRESS')
-    : activeAccount?.platform === 'WORDPRESS';
+  const isWordPressActive = composerMode === 'WORDPRESS';
+
+  const switchToMode = (mode: 'SOCIAL' | 'WORDPRESS') => {
+    setComposerMode(mode);
+    setError(null);
+    setSuccess(null);
+    if (mode === 'WORDPRESS') {
+      const wpAcc = accounts.find((a) => a.platform === 'WORDPRESS');
+      if (wpAcc) {
+        setSelectedAccountIds([wpAcc.id]);
+        setActiveTab(wpAcc.id);
+        setPreviewAccountId(wpAcc.id);
+        fetchWpCategories(wpAcc.id);
+      }
+    } else {
+      const socialAccs = accounts.filter((a) => a.platform !== 'WORDPRESS');
+      if (socialAccs.length > 0) {
+        const ids = socialAccs.map((a) => a.id);
+        setSelectedAccountIds(ids);
+        setActiveTab('MASTER');
+        setPreviewAccountId(ids[0]);
+      }
+    }
+  };
 
   const getEffectiveChannelData = (accId: string): ChannelCustomization => {
     const custom = customizations[accId];
@@ -1112,9 +1137,33 @@ export default function CreatePostPage() {
       .then((data) => {
         if (data.accounts && data.accounts.length > 0) {
           setAccounts(data.accounts);
-          const allIds = data.accounts.map((a: Account) => a.id);
-          setSelectedAccountIds(allIds);
-          setPreviewAccountId(data.accounts[0].id);
+          const socialAccs = data.accounts.filter((a: Account) => a.platform !== 'WORDPRESS');
+          const wpAccs = data.accounts.filter((a: Account) => a.platform === 'WORDPRESS');
+
+          const paramMode = searchParams.get('mode') || searchParams.get('platform');
+          if (paramMode?.toLowerCase() === 'wordpress' || (socialAccs.length === 0 && wpAccs.length > 0)) {
+            setComposerMode('WORDPRESS');
+            if (wpAccs.length > 0) {
+              setSelectedAccountIds([wpAccs[0].id]);
+              setActiveTab(wpAccs[0].id);
+              setPreviewAccountId(wpAccs[0].id);
+              fetchWpCategories(wpAccs[0].id);
+            }
+          } else {
+            setComposerMode('SOCIAL');
+            if (socialAccs.length > 0) {
+              const socialIds = socialAccs.map((a: Account) => a.id);
+              setSelectedAccountIds(socialIds);
+              setActiveTab('MASTER');
+              setPreviewAccountId(socialIds[0]);
+            } else if (wpAccs.length > 0) {
+              setComposerMode('WORDPRESS');
+              setSelectedAccountIds([wpAccs[0].id]);
+              setActiveTab(wpAccs[0].id);
+              setPreviewAccountId(wpAccs[0].id);
+              fetchWpCategories(wpAccs[0].id);
+            }
+          }
         }
       })
       .catch(console.error);
@@ -1240,95 +1289,108 @@ export default function CreatePostPage() {
     setError(null);
     setSuccess(null);
 
-    if (selectedAccountIds.length === 0) {
-      setError('Please select at least one social channel to publish to.');
+    const isWpMode = composerMode === 'WORDPRESS';
+    const targetAccountIds = isWpMode
+      ? accounts.filter((a) => a.platform === 'WORDPRESS').map((a) => a.id)
+      : selectedAccountIds.filter((id) => accounts.find((a) => a.id === id)?.platform !== 'WORDPRESS');
+
+    if (targetAccountIds.length === 0) {
+      setError(
+        isWpMode
+          ? 'কোনো ওয়ার্ডপ্রেস অ্যাকাউন্ট যুক্ত নেই। অনুগ্রহ করে Accounts মেনু থেকে সাইট কানেক্ট করুন।'
+          : 'Please select at least one social channel to publish to.'
+      );
       return;
     }
 
-    // Check Instagram & WordPress requirements across selected accounts
-    for (const accId of selectedAccountIds) {
-      const acc = accounts.find((a) => a.id === accId);
-      if (acc?.platform === 'INSTAGRAM') {
-        const eff = getEffectiveChannelData(accId);
-        if (!eff.mediaUrl) {
-          setError(
-            `Instagram account "${acc.name}" requires an image or video attachment. Please attach media either in the Master tab or directly on the Instagram tab.`
-          );
-          return;
-        }
-      }
-      if (acc?.platform === 'WORDPRESS') {
-        const eff = getEffectiveChannelData(accId);
-        if (!eff.title || !eff.title.trim()) {
-          setError(`WordPress post for "${acc.name}" requires an Article Title.`);
-          return;
-        }
-      }
-      const eff = getEffectiveChannelData(accId);
-      if (!eff.content.trim()) {
-        setError(`Post caption for "${acc?.name || 'Selected account'}" cannot be empty.`);
+    if (isWpMode) {
+      if (!currentTitle || !currentTitle.trim()) {
+        setError('ওয়ার্ডপ্রেস পোস্টের জন্য আর্টিকেলের শিরোনাম (Article Title) আবশ্যক।');
         return;
+      }
+      if (!currentContent || !currentContent.trim()) {
+        setError('ওয়ার্ডপ্রেস পোস্টের জন্য আর্টিকেলের মূল কন্টেন্ট (Article Body) আবশ্যক।');
+        return;
+      }
+    } else {
+      // Check Instagram & Social caption requirements
+      for (const accId of targetAccountIds) {
+        const acc = accounts.find((a) => a.id === accId);
+        if (acc?.platform === 'INSTAGRAM') {
+          const eff = getEffectiveChannelData(accId);
+          if (!eff.mediaUrl) {
+            setError(
+              `Instagram account "${acc.name}" requires an image or video attachment. Please attach media.`
+            );
+            return;
+          }
+        }
+        const eff = getEffectiveChannelData(accId);
+        if (!eff.content.trim()) {
+          setError(`Post caption for "${acc?.name || 'Selected account'}" cannot be empty.`);
+          return;
+        }
       }
     }
 
     setLoading(true);
 
     try {
-      // Build customizations payload for accounts with custom edits
+      // Build customizations payload for social accounts with custom edits
       const customPayload: Record<string, any> = {};
-      selectedAccountIds.forEach((accId) => {
-        const c = customizations[accId];
-        if (c && c.isCustomized) {
-          customPayload[accId] = {
-            isCustomized: true,
-            title: c.title?.trim() || undefined,
-            content: c.content.trim(),
-            categories: c.categories,
-            tags: c.tags,
-            excerpt: c.excerpt?.trim() || undefined,
-            wpStatus: c.wpStatus,
-            mediaUrl: c.mediaUrl.trim() || undefined,
-            mediaType: c.mediaType,
-            autoComment: c.enableFirstComment && c.firstCommentContent.trim()
-              ? {
-                  enabled: true,
-                  content: c.firstCommentContent.trim(),
-                  delayMinutes: c.firstCommentDelay,
-                }
-              : undefined,
-          };
-        }
-      });
+      if (!isWpMode) {
+        targetAccountIds.forEach((accId) => {
+          const c = customizations[accId];
+          if (c && c.isCustomized) {
+            customPayload[accId] = {
+              isCustomized: true,
+              content: c.content.trim(),
+              mediaUrl: c.mediaUrl.trim() || undefined,
+              mediaType: c.mediaType,
+              autoComment:
+                c.enableFirstComment && c.firstCommentContent.trim()
+                  ? {
+                      enabled: true,
+                      content: c.firstCommentContent.trim(),
+                      delayMinutes: c.firstCommentDelay,
+                    }
+                  : undefined,
+            };
+          }
+        });
+      }
 
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountIds: selectedAccountIds,
-          content: masterContent,
-          title: masterTitle.trim() || undefined,
-          categories: masterCategories,
-          tags: masterTags,
-          excerpt: masterExcerpt.trim() || undefined,
-          wpStatus: masterWpStatus,
-          mediaUrl: masterMediaUrl.trim() || undefined,
-          mediaType: masterMediaType,
+          accountIds: targetAccountIds,
+          content: currentContent.trim(),
+          title: isWpMode ? currentTitle.trim() : undefined,
+          categories: isWpMode ? currentCategories : undefined,
+          tags: isWpMode ? currentTags : undefined,
+          excerpt: isWpMode ? currentExcerpt.trim() : undefined,
+          wpStatus: isWpMode ? currentWpStatus : undefined,
+          mediaUrl: currentMediaUrl.trim() || undefined,
+          mediaType: currentMediaType,
           publishNow: publishMode === 'now',
           scheduledAt: publishMode === 'schedule' ? scheduledAt : undefined,
-          autoComment: masterEnableFirstComment && masterFirstCommentContent.trim()
-            ? {
-                enabled: true,
-                content: masterFirstCommentContent.trim(),
-                delayMinutes: masterFirstCommentDelay,
-              }
-            : undefined,
-          autoReply: enableAutoReply && autoReplyText.trim()
-            ? {
-                isEnabled: true,
-                replyText: autoReplyText.trim(),
-              }
-            : undefined,
-          milestoneTriggers: enableMilestones ? milestones : [],
+          autoComment:
+            !isWpMode && masterEnableFirstComment && masterFirstCommentContent.trim()
+              ? {
+                  enabled: true,
+                  content: masterFirstCommentContent.trim(),
+                  delayMinutes: masterFirstCommentDelay,
+                }
+              : undefined,
+          autoReply:
+            !isWpMode && enableAutoReply && autoReplyText.trim()
+              ? {
+                  isEnabled: true,
+                  replyText: autoReplyText.trim(),
+                }
+              : undefined,
+          milestoneTriggers: !isWpMode && enableMilestones ? milestones : [],
           customizations: customPayload,
         }),
       });
@@ -1341,9 +1403,13 @@ export default function CreatePostPage() {
       }
 
       setSuccess(
-        publishMode === 'now'
-          ? `Successfully published to ${selectedAccountIds.length} channel${selectedAccountIds.length > 1 ? 's' : ''}!`
-          : `Post scheduled across ${selectedAccountIds.length} channel${selectedAccountIds.length > 1 ? 's' : ''} successfully!`
+        isWpMode
+          ? publishMode === 'now'
+            ? 'ওয়ার্ডপ্রেসে পোস্ট সফলভাবে প্রকাশিত হয়েছে!'
+            : 'ওয়ার্ডপ্রেস পোস্ট সফলভাবে ক্যালেন্ডারে শিডিউল হয়েছে!'
+          : publishMode === 'now'
+          ? `Successfully published to ${targetAccountIds.length} channel${targetAccountIds.length > 1 ? 's' : ''}!`
+          : `Post scheduled across ${targetAccountIds.length} channel${targetAccountIds.length > 1 ? 's' : ''} successfully!`
       );
 
       setTimeout(() => {
@@ -1358,17 +1424,20 @@ export default function CreatePostPage() {
   };
 
   // Preview account determination
-  const previewAccount = isMaster
-    ? accounts.find((a) => a.id === previewAccountId) ||
-      accounts.find((a) => selectedAccountIds.includes(a.id)) ||
+  const isPreviewWordPress = composerMode === 'WORDPRESS';
+  const previewAccount = isPreviewWordPress
+    ? wpAccounts[0] || accounts.find((a) => a.platform === 'WORDPRESS') || accounts[0]
+    : isMaster
+    ? socialAccounts.find((a) => a.id === previewAccountId) ||
+      socialAccounts.find((a) => selectedAccountIds.includes(a.id)) ||
+      socialAccounts[0] ||
       accounts[0]
     : activeAccount;
 
   const previewData = previewAccount ? getEffectiveChannelData(previewAccount.id) : null;
-  const previewPlatform = previewAccount?.platform || 'FACEBOOK';
-  const isPreviewWordPress = previewPlatform === 'WORDPRESS';
-  const isPreviewLinkedIn = previewPlatform === 'LINKEDIN';
-  const isPreviewInstagram = previewPlatform === 'INSTAGRAM';
+  const previewPlatform = previewAccount?.platform || (isPreviewWordPress ? 'WORDPRESS' : 'FACEBOOK');
+  const isPreviewLinkedIn = !isPreviewWordPress && previewPlatform === 'LINKEDIN';
+  const isPreviewInstagram = !isPreviewWordPress && previewPlatform === 'INSTAGRAM';
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -1394,233 +1463,473 @@ export default function CreatePostPage() {
         </div>
       )}
 
-      {/* TOP CHANNEL SELECTOR BAR (Postiz Style) */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Select Channels to Publish
+      {/* TOP POST TYPE SELECTOR (Social Media vs WordPress) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/90 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => switchToMode('SOCIAL')}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              composerMode === 'SOCIAL'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+            }`}
+          >
+            <Share2 className="w-4 h-4" />
+            <span>সোশ্যাল মিডিয়া পোস্ট (Social Media)</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                composerMode === 'SOCIAL' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              Facebook • Instagram • LinkedIn
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
-              {selectedAccountIds.length} of {accounts.length} Selected
-            </span>
-          </div>
+          </button>
 
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={selectAllAccounts}
-              className="font-semibold text-indigo-600 hover:text-indigo-800 transition px-2 py-1 rounded-md hover:bg-indigo-50"
+          <button
+            type="button"
+            onClick={() => switchToMode('WORDPRESS')}
+            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+              composerMode === 'WORDPRESS'
+                ? 'bg-[#21759B] text-white shadow-md shadow-blue-100'
+                : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span>ওয়ার্ডপ্রেস আর্টিকেল (WordPress Blog Article)</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                composerMode === 'WORDPRESS' ? 'bg-[#1a5f7e] text-white' : 'bg-slate-200 text-slate-600'
+              }`}
             >
-              Select All
-            </button>
-            <span className="text-slate-300">•</span>
-            <button
-              type="button"
-              onClick={clearAccountSelection}
-              className="font-medium text-slate-500 hover:text-slate-700 transition px-2 py-1 rounded-md hover:bg-slate-100"
-            >
-              Reset
-            </button>
-          </div>
+              H1, H2, ক্যাটাগরি, ফিচারড ইমেজ
+            </span>
+          </button>
         </div>
 
-        {accounts.length === 0 ? (
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-            <span>No Facebook, Instagram, or LinkedIn account connected yet.</span>
-            <a href="/dashboard/accounts" className="font-semibold underline text-amber-900">
-              Connect Account
-            </a>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3 pt-1">
-            {accounts.map((acc) => {
-              const isSelected = selectedAccountIds.includes(acc.id);
-              return (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => toggleAccountSelection(acc.id)}
-                  className={`group relative flex items-center gap-3 p-2 pr-3.5 rounded-2xl border transition text-left cursor-pointer ${
-                    isSelected
-                      ? 'border-indigo-500 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/20'
-                      : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 opacity-60 hover:opacity-90'
-                  }`}
-                >
-                  <div className="relative">
-                    <ChannelAvatar
-                      avatar={acc.avatar}
-                      name={acc.name}
-                      platform={acc.platform}
-                      size="md"
-                    />
-                    {isSelected && (
-                      <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xs border-2 border-white">
-                        <Check className="w-2.5 h-2.5 stroke-[3]" />
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-bold truncate max-w-[130px] ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
-                      {acc.name}
-                    </p>
-                    <p className="text-[10px] text-slate-400 capitalize truncate">
-                      {acc.category?.toLowerCase().includes('profile') ? '👤 Profile' : '🏢 Page'} • {acc.platform.toLowerCase()}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+        {composerMode === 'WORDPRESS' && wpAccounts.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-[#21759B] font-semibold">
+            <Globe className="w-3.5 h-3.5" />
+            <span>সাইট: {wpAccounts[0].name} ({wpAccounts[0].pageId || wpAccounts[0].accountId})</span>
           </div>
         )}
       </div>
 
-      {/* DUAL-LEVEL EDITOR TABS: Master Tab & Per-Channel Customization Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
-        {/* Tab 1: Master Tab */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('MASTER')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition flex-shrink-0 cursor-pointer ${
-            isMaster
-              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/90'
-          }`}
-        >
-          <Globe className="w-3.5 h-3.5" />
-          <span>All Selected Channels</span>
-          <span
-            className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-              isMaster ? 'bg-indigo-700/80 text-white' : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {selectedAccountIds.length}
-          </span>
-        </button>
+      {/* SOCIAL MEDIA CHANNELS SELECTOR BAR */}
+      {composerMode === 'SOCIAL' && (
+        <>
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Select Channels to Publish
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+                  {selectedAccountIds.filter((id) => socialAccounts.some((a) => a.id === id)).length} of {socialAccounts.length} Selected
+                </span>
+              </div>
 
-        {/* Tab 2..N: Individual Selected Channel Tabs */}
-        {selectedAccountIds.map((accId) => {
-          const acc = accounts.find((a) => a.id === accId);
-          if (!acc) return null;
-          const isActive = activeTab === accId;
-          const isCustom = !!customizations[accId]?.isCustomized;
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setSelectedAccountIds(socialAccounts.map((a) => a.id))}
+                  className="font-semibold text-indigo-600 hover:text-indigo-800 transition px-2 py-1 rounded-md hover:bg-indigo-50 cursor-pointer"
+                >
+                  Select All
+                </button>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (socialAccounts.length > 0) {
+                      setSelectedAccountIds([socialAccounts[0].id]);
+                      setActiveTab('MASTER');
+                    }
+                  }}
+                  className="font-medium text-slate-500 hover:text-slate-700 transition px-2 py-1 rounded-md hover:bg-slate-100 cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
 
-          return (
+            {socialAccounts.length === 0 ? (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+                <span>No Facebook, Instagram, or LinkedIn account connected yet.</span>
+                <a href="/dashboard/accounts" className="font-semibold underline text-amber-900">
+                  Connect Account
+                </a>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                {socialAccounts.map((acc) => {
+                  const isSelected = selectedAccountIds.includes(acc.id);
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => toggleAccountSelection(acc.id)}
+                      className={`group relative flex items-center gap-3 p-2 pr-3.5 rounded-2xl border transition text-left cursor-pointer ${
+                        isSelected
+                          ? 'border-indigo-500 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/20'
+                          : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 opacity-60 hover:opacity-90'
+                      }`}
+                    >
+                      <div className="relative">
+                        <ChannelAvatar
+                          avatar={acc.avatar}
+                          name={acc.name}
+                          platform={acc.platform}
+                          size="md"
+                        />
+                        {isSelected && (
+                          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xs border-2 border-white">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold truncate max-w-[130px] ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                          {acc.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 capitalize truncate">
+                          {acc.category?.toLowerCase().includes('profile') ? '👤 Profile' : '🏢 Page'} • {acc.platform.toLowerCase()}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* DUAL-LEVEL EDITOR TABS: Master Tab & Per-Channel Customization Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
             <button
-              key={accId}
               type="button"
-              onClick={() => setActiveTab(accId)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition flex-shrink-0 cursor-pointer border ${
-                isActive
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200/90'
+              onClick={() => setActiveTab('MASTER')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition flex-shrink-0 cursor-pointer ${
+                isMaster
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/90'
               }`}
             >
-              <ChannelAvatar
-                avatar={acc.avatar}
-                name={acc.name}
-                platform={acc.platform}
-                size="xs"
-                showBadge={true}
-              />
-              <span className="truncate max-w-[120px]">{acc.name}</span>
-              {isCustom && (
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                    isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
-                  }`}
-                >
-                  Customized
-                </span>
-              )}
+              <Globe className="w-3.5 h-3.5" />
+              <span>All Selected Channels</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  isMaster ? 'bg-indigo-700/80 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {selectedAccountIds.filter((id) => socialAccounts.some((a) => a.id === id)).length}
+              </span>
             </button>
-          );
-        })}
-      </div>
+
+            {selectedAccountIds
+              .filter((id) => socialAccounts.some((a) => a.id === id))
+              .map((accId) => {
+                const acc = accounts.find((a) => a.id === accId);
+                if (!acc) return null;
+                const isActive = activeTab === accId;
+                const isCustom = !!customizations[accId]?.isCustomized;
+
+                return (
+                  <button
+                    key={accId}
+                    type="button"
+                    onClick={() => setActiveTab(accId)}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition flex-shrink-0 cursor-pointer border ${
+                      isActive
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/90'
+                    }`}
+                  >
+                    <ChannelAvatar
+                      avatar={acc.avatar}
+                      name={acc.name}
+                      platform={acc.platform}
+                      size="xs"
+                      showBadge={true}
+                    />
+                    <span className="truncate max-w-[120px]">{acc.name}</span>
+                    {isCustom && (
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                          isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        Customized
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+        </>
+      )}
+
+      {/* WORDPRESS SITE HEADER BAR */}
+      {composerMode === 'WORDPRESS' && (
+        <div className="bg-white p-5 rounded-2xl border border-blue-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-[#21759B] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+              W
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  {wpAccounts[0]?.name || 'WordPress Website'}
+                </h2>
+                <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Connected
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {wpAccounts[0]?.pageId || wpAccounts[0]?.accountId || 'https://yourwebsite.com'} • WordPress REST API Connected
+              </p>
+            </div>
+          </div>
+
+          {wpAccounts.length > 1 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600">Select Site:</span>
+              <select
+                value={selectedAccountIds[0] || ''}
+                onChange={(e) => {
+                  setSelectedAccountIds([e.target.value]);
+                  setActiveTab(e.target.value);
+                  setPreviewAccountId(e.target.value);
+                  fetchWpCategories(e.target.value);
+                }}
+                className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-medium bg-white"
+              >
+                {wpAccounts.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name} ({w.pageId || w.accountId})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Composer Form (7 cols) */}
         <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
-          {/* Active Channel Customization Notification Banner */}
-          {!isMaster && activeAccount && (
-            <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <ChannelAvatar
-                  avatar={activeAccount.avatar}
-                  name={activeAccount.name}
-                  platform={activeAccount.platform}
-                  size="sm"
-                />
-                <div className="min-w-0">
-                  <p className="font-bold truncate">
-                    Customizing exclusively for {activeAccount.name} ({activeAccount.platform})
-                  </p>
-                  <p className="text-[11px] text-amber-700">
-                    Changes made here override the master post content for this channel only.
-                  </p>
-                </div>
-              </div>
-
-              {customizations[activeAccount.id]?.isCustomized && (
-                <button
-                  type="button"
-                  onClick={() => resetChannelToMaster(activeAccount.id)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition text-[11px] flex-shrink-0 cursor-pointer shadow-2xs"
-                  title="Revert to master caption and media"
-                >
-                  <RotateCcw className="w-3 h-3" /> Reset to Master
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Composer Main Box */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-            {/* WordPress Article Title Input */}
-            {isWordPressActive && (
-              <div className="space-y-1.5 p-4 rounded-xl bg-blue-50/70 border border-blue-200">
+          {composerMode === 'WORDPRESS' ? (
+            /* ===================== WORDPRESS DEDICATED COMPOSER ===================== */
+            <div className="space-y-6">
+              {/* 1. Article Title Box (H1) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-[#21759B] uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-[#21759B]" /> WordPress Article Title <span className="text-rose-500">*</span>
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-[#21759B]" /> আর্টিকেল শিরোনাম / Title (H1) <span className="text-rose-500">*</span>
                   </label>
-                  <span className="text-[11px] text-[#21759B] font-semibold">H1 Heading</span>
+                  <span className="text-[11px] font-semibold text-[#21759B] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                    WordPress H1 Heading
+                  </span>
                 </div>
                 <input
                   type="text"
+                  required
                   value={currentTitle}
                   onChange={(e) => updateActiveTitle(e.target.value)}
-                  placeholder="e.g. 10 Essential Web Design Trends for 2026..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-blue-200 bg-white text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#21759B]"
+                  placeholder="যেমন: ১০টি সেরা ওয়ার্ডপ্রেস এসইও প্লাগইন যা আপনার সাইটের ট্রাফিক বাড়াবে..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-[#21759B] text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 transition placeholder:font-normal placeholder:text-slate-400"
                 />
               </div>
-            )}
 
-            {/* Post Caption / Article Body */}
-            <div className="relative">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  {isWordPressActive
-                    ? isMaster
-                      ? 'Master Content / Article Body'
-                      : `${activeAccount?.name} Article Body`
-                    : isMaster
-                    ? 'Master Post Caption'
-                    : `${activeAccount?.name} Caption`}
-                </label>
-                <span className="text-xs text-slate-400">{currentContent.length} characters</span>
+              {/* 2. Featured Image Box (ফিচারড ইমেজ আপলোড করা) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-[#21759B]" /> ফিচারড ইমেজ আপলোড করুন (Featured Image)
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      ব্লগ পোস্টের মূল কভার ছবি যা আর্টিকেলের শীর্ষে এবং সোশ্যাল শেয়ারে দেখাবে
+                    </p>
+                  </div>
+                  {currentMediaUrl && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      ✓ Image Attached
+                    </span>
+                  )}
+                </div>
+
+                {!currentMediaUrl ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-blue-200 hover:border-[#21759B] bg-blue-50/30 hover:bg-blue-50/70 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <div className="h-12 w-12 rounded-2xl bg-blue-100 text-[#21759B] group-hover:bg-[#21759B] group-hover:text-white flex items-center justify-center transition shadow-xs">
+                      {uploadingMedia ? <Loader2 className="w-6 h-6 animate-spin" /> : <UploadCloud className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        {uploadingMedia ? 'ছবি আপলোড হচ্ছে...' : 'ক্লিক করে ফিচারড ইমেজ আপলোড করুন'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        JPG, PNG, WEBP ফরম্যাট সাপোর্ট করে
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group max-h-72">
+                    <img src={currentMediaUrl} alt="Featured" className="w-full h-64 object-cover" />
+                    <button
+                      type="button"
+                      onClick={removeActiveMedia}
+                      className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-white transition shadow-md cursor-pointer"
+                      title="ছবি মুছে ফেলুন"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <span className="absolute bottom-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900/80 text-white uppercase tracking-wider">
+                      Featured Image
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* WordPress HTML Formatting Toolbar & Inline Image Uploader */}
-              {isWordPressActive ? (
-                <div className="mb-2 p-2 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+              {/* 3. Categories Selection Box (ক্যাটাগরি সিলেক্ট করা) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Tag className="w-4 h-4 text-[#21759B]" /> ক্যাটাগরি সিলেক্ট করুন (WordPress Categories)
+                    </label>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      সংযুক্ত ওয়ার্ডপ্রেস সাইট থেকে সরাসরি ক্যাটাগরি আনা হয়েছে
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">
+                      {currentCategories.length} টি নির্বাচিত
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const wpAcc = accounts.find((a) => a.platform === 'WORDPRESS');
+                        if (wpAcc) fetchWpCategories(wpAcc.id);
+                      }}
+                      disabled={loadingWpCategories}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 text-[#21759B] text-[11px] font-semibold transition cursor-pointer"
+                      title="ক্যাটাগরি রিলোড করুন"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${loadingWpCategories ? 'animate-spin' : ''}`} />
+                      <span>রিফ্রেশ</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Category Search if more than 4 */}
+                {wpCategories.length > 4 && (
+                  <div className="relative max-w-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                      placeholder="ক্যাটাগরি সার্চ করুন..."
+                      className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#21759B] bg-slate-50/50"
+                    />
+                  </div>
+                )}
+
+                {loadingWpCategories ? (
+                  <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center justify-center gap-2 text-xs text-[#21759B] font-semibold">
+                    <Loader2 className="w-4 h-4 animate-spin" /> ওয়ার্ডপ্রেস থেকে ক্যাটাগরি লোড হচ্ছে...
+                  </div>
+                ) : wpCategories.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {wpCategories
+                      .filter((c) => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()))
+                      .map((cat) => {
+                        const isSelected = (currentCategories || []).includes(cat.id);
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              const current = currentCategories || [];
+                              if (isSelected) {
+                                updateActiveCategories(current.filter((id) => id !== cat.id));
+                              } else {
+                                updateActiveCategories([...current, cat.id]);
+                              }
+                            }}
+                            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border flex items-center gap-2 cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs ring-2 ring-blue-300/60 scale-[1.02]'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                isSelected ? 'bg-white text-[#21759B]' : 'bg-slate-200 text-slate-400'
+                              }`}
+                            >
+                              {isSelected ? <Check className="w-3 h-3 stroke-[3]" /> : '+'}
+                            </span>
+                            <span>{cat.name}</span>
+                            {cat.count !== undefined && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                  isSelected ? 'bg-blue-700/60 text-white' : 'bg-slate-200 text-slate-500'
+                                }`}
+                              >
+                                {cat.count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">
+                    ডিফল্ট ক্যাটাগরি (Uncategorized) ব্যবহার করা হবে।
+                  </p>
+                )}
+              </div>
+
+              {/* 4. Article Content with HTML Toolbar (H1, H2, H3, bold, inline image) */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileCode className="w-4 h-4 text-[#21759B]" /> আর্টিকেল বডি ও ফরম্যাটিং (Article Body) <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-xs text-slate-400">{currentContent.length} characters</span>
+                </div>
+
+                {/* WordPress HTML Formatting Toolbar */}
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    {/* HTML Quick Formatting Tags */}
-                    <div className="flex flex-wrap items-center gap-1 text-xs">
-                      <span className="text-[11px] font-bold text-slate-500 px-1">HTML:</span>
+                    {/* Quick Formatting Tags with H1, H2, H3 */}
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="text-[11px] font-bold text-slate-500 mr-1">HTML:</span>
+                      <button
+                        type="button"
+                        onClick={() => insertHtmlTag('<h1>', '</h1>', 'Heading 1')}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-900 font-black border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
+                        title="Heading 1 (<h1>)"
+                      >
+                        H1
+                      </button>
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<h2>', '</h2>', 'Section Heading')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-800 font-bold border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
                         title="Heading 2 (<h2>)"
                       >
                         H2
@@ -1628,7 +1937,7 @@ export default function CreatePostPage() {
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<h3>', '</h3>', 'Sub-heading')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
                         title="Heading 3 (<h3>)"
                       >
                         H3
@@ -1636,7 +1945,7 @@ export default function CreatePostPage() {
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<strong>', '</strong>', 'Bold text')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-200 transition text-[11px] cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-800 font-bold border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
                         title="Bold (<strong>)"
                       >
                         B
@@ -1644,15 +1953,15 @@ export default function CreatePostPage() {
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<em>', '</em>', 'Italic text')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 italic border border-slate-200 transition text-[11px] cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-800 italic border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
                         title="Italic (<em>)"
                       >
                         I
                       </button>
                       <button
                         type="button"
-                        onClick={() => insertHtmlTag('<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2">', '</blockquote>', 'Quote text')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer"
+                        onClick={() => insertHtmlTag('<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2">', '</blockquote>', 'Quote')}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
                         title="Blockquote"
                       >
                         Quote
@@ -1660,15 +1969,15 @@ export default function CreatePostPage() {
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<ul>\n  <li>', '</li>\n</ul>', 'List item')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer"
-                        title="Bulleted List (<ul><li>)"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
+                        title="Bulleted List"
                       >
                         List
                       </button>
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<a href="https://example.com" target="_blank" rel="noopener noreferrer">', '</a>', 'Link')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 text-blue-600 underline border border-slate-200 transition text-[11px] cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-blue-600 underline border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
                         title="Hyperlink (<a>)"
                       >
                         Link
@@ -1676,8 +1985,8 @@ export default function CreatePostPage() {
                       <button
                         type="button"
                         onClick={() => insertHtmlTag('<pre><code>', '</code></pre>', 'Code')}
-                        className="px-2 py-1 rounded bg-white hover:bg-slate-200 font-mono text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer"
-                        title="Code snippet (<pre><code>)"
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 font-mono text-slate-700 border border-slate-200 transition text-[11px] cursor-pointer shadow-2xs"
+                        title="Code snippet"
                       >
                         Code
                       </button>
@@ -1689,8 +1998,8 @@ export default function CreatePostPage() {
                         type="button"
                         disabled={uploadingInline}
                         onClick={() => inlineImageInputRef.current?.click()}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#21759B] hover:bg-[#1a5f7e] text-white font-semibold transition text-[11px] cursor-pointer shadow-xs disabled:opacity-50"
-                        title="Upload and insert image directly inside HTML content"
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#21759B] hover:bg-[#1a5f7e] text-white font-semibold transition text-[11px] cursor-pointer shadow-xs disabled:opacity-50"
+                        title="কন্টেন্টের ভেতরে ছবি যুক্ত করুন"
                       >
                         {uploadingInline ? (
                           <>
@@ -1717,9 +2026,7 @@ export default function CreatePostPage() {
                         type="button"
                         onClick={() => setEditorMode('code')}
                         className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
-                          editorMode === 'code'
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
+                          editorMode === 'code' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         <FileCode className="w-3 h-3" /> HTML Code
@@ -1728,9 +2035,7 @@ export default function CreatePostPage() {
                         type="button"
                         onClick={() => setEditorMode('visual')}
                         className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer ${
-                          editorMode === 'visual'
-                            ? 'bg-white text-slate-900 shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
+                          editorMode === 'visual' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
                         <Eye className="w-3 h-3" /> Visual View
@@ -1738,263 +2043,35 @@ export default function CreatePostPage() {
                     </div>
                   </div>
                 </div>
-              ) : (
-                /* Quick Mention Toolbar for Social Channels */
-                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                  <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-                    <AtSign className="w-3 h-3 text-indigo-500" /> Mention:
-                  </span>
-                  {AUDIENCE_TAGS.map((t) => (
-                    <button
-                      key={t.tag}
-                      type="button"
-                      onClick={() => quickInsertMentionToField('content', t.tag)}
-                      className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition border border-slate-200 cursor-pointer"
-                    >
-                      {t.tag}
-                    </button>
-                  ))}
-                </div>
-              )}
 
-              {/* Editor: Code or Visual */}
-              {isWordPressActive && editorMode === 'visual' ? (
-                <div className="w-full min-h-[160px] max-h-[400px] overflow-y-auto p-4 rounded-xl border border-slate-300 bg-slate-50/50 text-sm leading-relaxed text-slate-900">
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        currentContent ||
-                        '<p class="text-slate-400 italic">No content written yet. Switch to "HTML Code" tab above to write or insert HTML tags and inline images.</p>',
-                    }}
-                  />
-                </div>
-              ) : (
-                <textarea
-                  ref={contentRef}
-                  required
-                  rows={isWordPressActive ? 8 : 4}
-                  value={currentContent}
-                  onChange={(e) =>
-                    handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
-                  }
-                  onKeyUp={(e) =>
-                    handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
-                  }
-                  onClick={(e) =>
-                    handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
-                  }
-                  placeholder={
-                    isWordPressActive
-                      ? 'Write your blog post article here using HTML tags like <h2>, <p>, <strong>, <a>, and inline images using the toolbar above...'
-                      : isMaster
-                      ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
-                      : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
-                  }
-                  className={`w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed text-slate-900 ${
-                    isWordPressActive ? 'font-mono text-xs' : ''
-                  }`}
-                />
-              )}
-              {renderMentionDropdown('content')}
-            </div>
-
-            {/* Direct Media Upload (Featured Media) */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  {isWordPressActive
-                    ? 'Featured Image / Main Media'
-                    : isMaster
-                    ? 'Master Media Attachment'
-                    : `${activeAccount?.name} Media Attachment`}
-                </label>
-                {activeAccount?.platform === 'INSTAGRAM' && (
-                  <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
-                    Media Required for Instagram
-                  </span>
-                )}
-                {isWordPressActive && (
-                  <span className="text-[10px] font-bold text-[#21759B] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                    WordPress Featured Media
-                  </span>
-                )}
-              </div>
-
-              {!currentMediaUrl ? (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                  <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition shadow-xs">
-                    {uploadingMedia ? (
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <UploadCloud className="w-6 h-6" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      {uploadingMedia ? 'Uploading media...' : 'Click to browse or drag & drop file'}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Supports JPG, PNG, GIF, WEBP or MP4, MOV videos
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group">
-                  {currentMediaType === 'VIDEO' ? (
-                    <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
-                  ) : (
-                    <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
-                  )}
-                  <button
-                    type="button"
-                    onClick={removeActiveMedia}
-                    className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-white transition shadow-md"
-                    title="Remove media"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <span className="absolute bottom-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900/80 text-white uppercase tracking-wider">
-                    {currentMediaType} Attached
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* WordPress Article & Publishing Controls */}
-          {isWordPressActive && (
-            <div className="bg-gradient-to-br from-white to-blue-50/40 p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-6 animate-in fade-in">
-              {/* Header with Site Info & Refresh */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-blue-100">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-[#21759B] text-white flex items-center justify-center font-bold shadow-xs">
-                    <FileText className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm sm:text-base text-slate-900">WordPress Article & Publishing Controls</h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#21759B]">
-                        Live WordPress Sync
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {accounts.find((a) => a.platform === 'WORDPRESS')?.name
-                        ? `সংযুক্ত সাইট: ${accounts.find((a) => a.platform === 'WORDPRESS')?.name} (${accounts.find((a) => a.platform === 'WORDPRESS')?.pageId || accounts.find((a) => a.platform === 'WORDPRESS')?.accountId})`
-                        : 'ওয়ার্ডপ্রেস সাইটের জন্য ক্যাটাগরি, শিডিউলিং ও দৃশ্যমানতা নিয়ন্ত্রণ করুন'}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const wpAcc = accounts.find((a) => a.platform === 'WORDPRESS');
-                    if (wpAcc) fetchWpCategories(wpAcc.id);
-                  }}
-                  disabled={loadingWpCategories}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-[#21759B] font-semibold text-xs border border-blue-200 shadow-2xs transition cursor-pointer disabled:opacity-50"
-                  title="ওয়ার্ডপ্রেস থেকে ক্যাটাগরি পুনরায় লোড করুন"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingWpCategories ? 'animate-spin' : ''}`} />
-                  <span>ক্যাটাগরি রিফ্রেশ</span>
-                </button>
-              </div>
-
-              {/* 1. Category Selection */}
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Tag className="w-4 h-4 text-[#21759B]" /> পোস্টের ক্যাটাগরি সিলেক্ট করুন (Categories)
-                  </label>
-                  <span className="text-xs text-slate-500 font-medium">
-                    {currentCategories.length} টি ক্যাটাগরি নির্বাচিত
-                  </span>
-                </div>
-
-                {/* Optional category search if categories > 4 */}
-                {wpCategories.length > 4 && (
-                  <div className="relative max-w-xs">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      value={categorySearch}
-                      onChange={(e) => setCategorySearch(e.target.value)}
-                      placeholder="ক্যাটাগরি খুঁজুন..."
-                      className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#21759B] bg-white"
+                {/* Editor: Code or Visual */}
+                {editorMode === 'visual' ? (
+                  <div className="w-full min-h-[200px] max-h-[450px] overflow-y-auto p-4 rounded-xl border border-slate-300 bg-slate-50/50 text-sm leading-relaxed text-slate-900">
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html:
+                          currentContent ||
+                          '<p class="text-slate-400 italic">এখানে আপনার আর্টিকেলের ভিজ্যুয়াল প্রিভিউ দেখাবে। কন্টেন্ট লিখতে উপরের "HTML Code" ট্যাবে যান।</p>',
+                      }}
                     />
                   </div>
-                )}
-
-                {loadingWpCategories ? (
-                  <div className="p-6 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center justify-center gap-2 text-xs text-[#21759B] font-semibold">
-                    <Loader2 className="w-4 h-4 animate-spin" /> ওয়ার্ডপ্রেস সাইট থেকে ক্যাটাগরি আনা হচ্ছে...
-                  </div>
-                ) : wpCategories.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {wpCategories
-                      .filter((c) => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()))
-                      .map((cat) => {
-                        const isSelected = (currentCategories || []).includes(cat.id);
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => {
-                              const current = currentCategories || [];
-                              if (isSelected) {
-                                updateActiveCategories(current.filter((id) => id !== cat.id));
-                              } else {
-                                updateActiveCategories([...current, cat.id]);
-                              }
-                            }}
-                            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border flex items-center gap-2 cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs ring-2 ring-blue-300/60 scale-[1.02]'
-                                : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
-                            }`}
-                          >
-                            <span
-                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                                isSelected ? 'bg-white text-[#21759B]' : 'bg-slate-100 text-slate-400'
-                              }`}
-                            >
-                              {isSelected ? <Check className="w-3 h-3 stroke-[3]" /> : '+'}
-                            </span>
-                            <span>{cat.name}</span>
-                            {cat.count !== undefined && (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                  isSelected ? 'bg-blue-700/60 text-white' : 'bg-slate-100 text-slate-500'
-                                }`}
-                              >
-                                {cat.count}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                  </div>
                 ) : (
-                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                    কোনো ক্যাটাগরি পাওয়া যায়নি। ডিফল্ট ক্যাটাগরি (Uncategorized) ব্যবহার করা হবে।
-                  </div>
+                  <textarea
+                    ref={contentRef}
+                    required
+                    rows={10}
+                    value={currentContent}
+                    onChange={(e) => updateActiveContent(e.target.value)}
+                    placeholder="এখানে আপনার ব্লগের আর্টিকেল লিখুন। উপরের টুলবার দিয়ে <h1>, <h2>, <h3>, <strong>, <a> ট্যাগ এবং ইনলাইন ছবি যুক্ত করতে পারবেন..."
+                    className="w-full p-4 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#21759B] transition leading-relaxed text-slate-900"
+                  />
                 )}
               </div>
 
-              {/* 2. WordPress Post Visibility & Status Cards */}
-              <div className="space-y-3 pt-2">
+              {/* 5. WordPress Post Visibility & Status */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-[#21759B]" /> পোস্টের দৃশ্যমানতা ও স্ট্যাটাস নির্বাচন করুন
+                  <Globe className="w-4 h-4 text-[#21759B]" /> পোস্টের দৃশ্যমানতা ও স্ট্যাটাস (Status & Visibility)
                 </label>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -2018,7 +2095,7 @@ export default function CreatePostPage() {
                         </span>
                         <div>
                           <p className="font-bold text-xs text-slate-900">Public (পাবলিক)</p>
-                          <span className="text-[10px] text-emerald-700 font-semibold">সবার জন্য উন্মুক্ত</span>
+                          <span className="text-[10px] text-emerald-700 font-semibold">সবার জন্য লাইভ</span>
                         </div>
                       </div>
                       <input
@@ -2066,7 +2143,7 @@ export default function CreatePostPage() {
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                      শুধুমাত্র সাইটের অ্যাডমিন ও লগইন করা অথর দেখতে পারবেন। সাধারণ পাঠকরা দেখতে পাবে না।
+                      শুধুমাত্র সাইটের অ্যাডমিন ও অথর দেখতে পারবেন। সাধারণ পাঠকরা দেখতে পাবে না।
                     </p>
                   </div>
 
@@ -2142,356 +2219,572 @@ export default function CreatePostPage() {
                 </div>
               </div>
 
-              {/* 3. Post Tags & Excerpt */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-blue-100">
-                {/* Tags */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-slate-400" /> Post Tags (ট্যাগ - কমা দিয়ে আলাদা করুন)
-                  </label>
-                  <input
-                    type="text"
-                    value={currentTags}
-                    onChange={(e) => updateActiveTags(e.target.value)}
-                    placeholder="যেমন: wordpress, technology, web dev"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">ওয়ার্ডপ্রেসের ট্যাগে যুক্ত হবে</p>
-                </div>
-
-                {/* Excerpt */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Post Excerpt / সারসংক্ষেপ (ঐচ্ছিক)
-                  </label>
-                  <input
-                    type="text"
-                    value={currentExcerpt}
-                    onChange={(e) => updateActiveExcerpt(e.target.value)}
-                    placeholder="পোস্টের সংক্ষিপ্ত বিবরণ যা ব্লগ পেজে এবং গুগল সার্চে শো করবে..."
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">ব্লগ গ্রিড ও সার্চ ইঞ্জিনের মেটা ডেসক্রিপশনে সাহায্য করে</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* SECTION 1: Automated First Comment */}
-          <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <MessageSquare className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">
-                    {isMaster ? 'Automated First Comment' : `First Comment for ${activeAccount?.name}`}
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Instantly drop your link or call-to-action in comment #1
-                  </p>
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={currentEnableFirstComment}
-                  onChange={(e) => updateActiveFirstCommentEnabled(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-              </label>
-            </div>
-
-            {currentEnableFirstComment && (
-              <div className="pt-3 border-t border-slate-100 space-y-3 relative">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
-                    <AtSign className="w-3 h-3 text-indigo-500" /> Tag:
-                  </span>
-                  {AUDIENCE_TAGS.slice(0, 3).map((t) => (
-                    <button
-                      key={t.tag}
-                      type="button"
-                      onClick={() => quickInsertMentionToField('firstComment', t.tag)}
-                      className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[10px] font-semibold transition border border-slate-200"
-                    >
-                      {t.tag}
-                    </button>
-                  ))}
-                </div>
-
-                <textarea
-                  ref={firstCommentRef}
-                  rows={2}
-                  value={currentFirstCommentContent}
-                  onChange={(e) =>
-                    handleInputChangeWithMention('firstComment', e.target.value, e.target.selectionStart)
-                  }
-                  onKeyUp={(e) =>
-                    handleInputChangeWithMention('firstComment', (e.target as any).value, (e.target as any).selectionStart)
-                  }
-                  onClick={(e) =>
-                    handleInputChangeWithMention('firstComment', (e.target as any).value, (e.target as any).selectionStart)
-                  }
-                  placeholder="👉 Full tutorial & download link: https://example.com (Type @ to mention)"
-                  className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 text-slate-800"
-                />
-                {renderMentionDropdown('firstComment')}
-
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-600">Timing:</span>
-                  <select
-                    value={currentFirstCommentDelay}
-                    onChange={(e) => updateActiveFirstCommentDelay(Number(e.target.value))}
-                    className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
-                  >
-                    <option value={0}>Instant (Drop with post)</option>
-                    <option value={5}>Delay by 5 minutes</option>
-                    <option value={15}>Delay by 15 minutes</option>
-                    <option value={30}>Delay by 30 minutes</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* SECTION 2: Engagement Milestone Comment Triggers */}
-          <div className="bg-white p-6 rounded-2xl border border-amber-200/80 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <ThumbsUp className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">
-                    Engagement Milestone Triggers
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Drop automated comments when reaching like/comment targets
-                  </p>
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enableMilestones}
-                  onChange={(e) => setEnableMilestones(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-              </label>
-            </div>
-
-            {enableMilestones && (
-              <div className="pt-3 border-t border-slate-100 space-y-3">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => addMilestone('LIKES', 10)}
-                    className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold border border-amber-200 transition"
-                  >
-                    + 10 Likes Trigger
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => addMilestone('COMMENTS', 25)}
-                    className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold border border-amber-200 transition"
-                  >
-                    + 25 Comments Trigger
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {milestones.map((m, idx) => (
-                    <div
-                      key={m.id}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3 text-xs"
-                    >
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2 font-bold text-slate-800">
-                          <span>Target:</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={m.threshold}
-                            onChange={(e) => {
-                              const val = Number(e.target.value);
-                              setMilestones((prev) =>
-                                prev.map((item) => (item.id === m.id ? { ...item, threshold: val } : item))
-                              );
-                            }}
-                            className="w-16 px-1.5 py-0.5 border rounded bg-white"
-                          />
-                          <span>{m.type}</span>
-                        </div>
-                        <input
-                          type="text"
-                          value={m.commentText}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setMilestones((prev) =>
-                              prev.map((item) => (item.id === m.id ? { ...item, commentText: val } : item))
-                            );
-                          }}
-                          className="w-full px-2 py-1 border rounded bg-white text-slate-800"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeMilestone(m.id)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* SECTION 3: Smart Comment Auto-Reply with Tagging */}
-          <div className="bg-white p-6 rounded-2xl border border-violet-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900">Auto-Reply to User Comments</h3>
-                  <p className="text-[11px] text-slate-500">
-                    Automatically reply whenever someone leaves a comment
-                  </p>
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={enableAutoReply}
-                  onChange={(e) => setEnableAutoReply(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
-              </label>
-            </div>
-
-            {enableAutoReply && (
-              <div className="pt-3 border-t border-slate-100 space-y-2.5 relative">
-                <div className="p-3 rounded-xl bg-violet-50/80 border border-violet-200 flex items-start gap-2.5 text-xs text-violet-900">
-                  <Bell className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
+              {/* 6. Tags & Excerpt */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="font-bold text-violet-950">
-                      Smart Commenter Tagging & Instant Notification
-                    </p>
-                    <p className="text-[11px] text-violet-700 mt-0.5 leading-relaxed">
-                      PostCraft will automatically tag the commenter (e.g.{' '}
-                      <span className="font-bold text-violet-950 bg-white px-1.5 py-0.5 rounded border border-violet-200">
-                        @CommenterName
-                      </span>
-                      ) in your reply so Facebook, Instagram & LinkedIn trigger an instant push notification on their phone!
-                    </p>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-slate-400" /> Post Tags (ট্যাগ - কমা দিয়ে আলাদা করুন)
+                    </label>
+                    <input
+                      type="text"
+                      value={currentTags}
+                      onChange={(e) => updateActiveTags(e.target.value)}
+                      placeholder="যেমন: wordpress, technology, web dev"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">ওয়ার্ডপ্রেসের ট্যাগে যুক্ত হবে</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                      <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Post Excerpt / সারসংক্ষেপ (ঐচ্ছিক)
+                    </label>
+                    <input
+                      type="text"
+                      value={currentExcerpt}
+                      onChange={(e) => updateActiveExcerpt(e.target.value)}
+                      placeholder="পোস্টের সংক্ষিপ্ত বিবরণ যা ব্লগ আর্কাইভে এবং গুগল সার্চে দেখাবে..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">এসইও মেটা ডেসক্রিপশনে ব্যবহৃত হবে</p>
                   </div>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Reply Message Template
-                  </label>
+              {/* 7. WordPress Publishing Schedule & Submit */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-4">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => quickInsertMentionToField('autoReply', '{name}')}
-                    className="px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-800 text-[11px] font-bold border border-violet-300 transition flex items-center gap-1 cursor-pointer"
+                    onClick={() => setPublishMode('now')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      publishMode === 'now'
+                        ? 'border-[#21759B] bg-blue-50 text-[#21759B] shadow-xs'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
                   >
-                    + Insert {'{name}'} Tag
+                    <Send className="w-4 h-4" /> Publish Now
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPublishMode('schedule')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      publishMode === 'schedule'
+                        ? 'border-[#21759B] bg-blue-50 text-[#21759B] shadow-xs'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" /> Schedule Later
                   </button>
                 </div>
 
-                <textarea
-                  ref={autoReplyRef}
-                  rows={2}
-                  value={autoReplyText}
-                  onChange={(e) =>
-                    handleInputChangeWithMention('autoReply', e.target.value, e.target.selectionStart)
-                  }
-                  onKeyUp={(e) =>
-                    handleInputChangeWithMention('autoReply', (e.target as any).value, (e.target as any).selectionStart)
-                  }
-                  onClick={(e) =>
-                    handleInputChangeWithMention('autoReply', (e.target as any).value, (e.target as any).selectionStart)
-                  }
-                  placeholder="Hello {name}, thanks for your comment! Check your DM! 🙌 (Type @ to mention)"
-                  className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-500 text-slate-800"
-                />
-                {renderMentionDropdown('autoReply')}
+                {publishMode === 'schedule' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#21759B] font-medium bg-white"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || uploadingMedia}
+                  className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-[#21759B] hover:bg-[#1a5f7e] text-white font-semibold text-sm shadow-md shadow-blue-100 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Publishing to WordPress...
+                    </>
+                  ) : publishMode === 'now' ? (
+                    <>
+                      <Send className="w-4 h-4" /> Publish Article to WordPress Now
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4" /> Schedule Article to Calendar
+                    </>
+                  )}
+                </button>
               </div>
-            )}
-          </div>
-
-          {/* Publishing Schedule & Submit */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setPublishMode('now')}
-                className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition ${
-                  publishMode === 'now'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Send className="w-4 h-4" /> Publish Now
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPublishMode('schedule')}
-                className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition ${
-                  publishMode === 'schedule'
-                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Calendar className="w-4 h-4" /> Schedule Later
-              </button>
             </div>
+          ) : (
+            /* ===================== SOCIAL MEDIA COMPOSER ===================== */
+            <>
+              {/* Active Channel Customization Notification Banner */}
+              {!isMaster && activeAccount && (
+                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <ChannelAvatar
+                      avatar={activeAccount.avatar}
+                      name={activeAccount.name}
+                      platform={activeAccount.platform}
+                      size="sm"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-bold truncate">
+                        Customizing exclusively for {activeAccount.name} ({activeAccount.platform})
+                      </p>
+                      <p className="text-[11px] text-amber-700">
+                        Changes made here override the master post content for this channel only.
+                      </p>
+                    </div>
+                  </div>
 
-            {publishMode === 'schedule' && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" /> Date & Time
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
-                />
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || selectedAccountIds.length === 0 || uploadingMedia}
-              className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-100 transition disabled:opacity-50 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Publishing to {selectedAccountIds.length} Channels...
-                </>
-              ) : publishMode === 'now' ? (
-                <>
-                  <Send className="w-4 h-4" /> Publish Live Post ({selectedAccountIds.length} Channel{selectedAccountIds.length > 1 ? 's' : ''})
-                </>
-              ) : (
-                <>
-                  <Calendar className="w-4 h-4" /> Schedule ({selectedAccountIds.length} Channel{selectedAccountIds.length > 1 ? 's' : ''}) to Calendar
-                </>
+                  {customizations[activeAccount.id]?.isCustomized && (
+                    <button
+                      type="button"
+                      onClick={() => resetChannelToMaster(activeAccount.id)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition text-[11px] flex-shrink-0 cursor-pointer shadow-2xs"
+                      title="Revert to master caption and media"
+                    >
+                      <RotateCcw className="w-3 h-3" /> Reset to Master
+                    </button>
+                  )}
+                </div>
               )}
-            </button>
-          </div>
+
+              {/* Composer Main Box */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                {/* Post Caption */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                      {isMaster ? 'Master Post Caption' : `${activeAccount?.name} Caption`}
+                    </label>
+                    <span className="text-xs text-slate-400">{currentContent.length} characters</span>
+                  </div>
+
+                  {/* Quick Mention Toolbar for Social Channels */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                      <AtSign className="w-3 h-3 text-indigo-500" /> Mention:
+                    </span>
+                    {AUDIENCE_TAGS.map((t) => (
+                      <button
+                        key={t.tag}
+                        type="button"
+                        onClick={() => quickInsertMentionToField('content', t.tag)}
+                        className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition border border-slate-200 cursor-pointer"
+                      >
+                        {t.tag}
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea
+                    ref={contentRef}
+                    required
+                    rows={4}
+                    value={currentContent}
+                    onChange={(e) =>
+                      handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
+                    }
+                    onKeyUp={(e) =>
+                      handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
+                    }
+                    onClick={(e) =>
+                      handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
+                    }
+                    placeholder={
+                      isMaster
+                        ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
+                        : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
+                    }
+                    className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed text-slate-900"
+                  />
+                  {renderMentionDropdown('content')}
+                </div>
+
+                {/* Direct Media Upload */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                      {isMaster ? 'Master Media Attachment' : `${activeAccount?.name} Media Attachment`}
+                    </label>
+                    {activeAccount?.platform === 'INSTAGRAM' && (
+                      <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
+                        Media Required for Instagram
+                      </span>
+                    )}
+                  </div>
+
+                  {!currentMediaUrl ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                      <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition shadow-xs">
+                        {uploadingMedia ? (
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                        ) : (
+                          <UploadCloud className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {uploadingMedia ? 'Uploading media...' : 'Click to browse or drag & drop file'}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Supports JPG, PNG, GIF, WEBP or MP4, MOV videos
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group">
+                      {currentMediaType === 'VIDEO' ? (
+                        <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
+                      ) : (
+                        <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={removeActiveMedia}
+                        className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-white transition shadow-md cursor-pointer"
+                        title="Remove media"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <span className="absolute bottom-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900/80 text-white uppercase tracking-wider">
+                        {currentMediaType} Attached
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SECTION 1: Automated First Comment */}
+              <div className="bg-white p-6 rounded-2xl border border-indigo-100 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                      <MessageSquare className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">
+                        {isMaster ? 'Automated First Comment' : `First Comment for ${activeAccount?.name}`}
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Instantly drop your link or call-to-action in comment #1
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={currentEnableFirstComment}
+                      onChange={(e) => updateActiveFirstCommentEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {currentEnableFirstComment && (
+                  <div className="pt-3 border-t border-slate-100 space-y-3 relative">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                        <AtSign className="w-3 h-3 text-indigo-500" /> Tag:
+                      </span>
+                      {AUDIENCE_TAGS.slice(0, 3).map((t) => (
+                        <button
+                          key={t.tag}
+                          type="button"
+                          onClick={() => quickInsertMentionToField('firstComment', t.tag)}
+                          className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[10px] font-semibold transition border border-slate-200 cursor-pointer"
+                        >
+                          {t.tag}
+                        </button>
+                      ))}
+                    </div>
+
+                    <textarea
+                      ref={firstCommentRef}
+                      rows={2}
+                      value={currentFirstCommentContent}
+                      onChange={(e) =>
+                        handleInputChangeWithMention('firstComment', e.target.value, e.target.selectionStart)
+                      }
+                      onKeyUp={(e) =>
+                        handleInputChangeWithMention('firstComment', (e.target as any).value, (e.target as any).selectionStart)
+                      }
+                      onClick={(e) =>
+                        handleInputChangeWithMention('firstComment', (e.target as any).value, (e.target as any).selectionStart)
+                      }
+                      placeholder="👉 Full tutorial & download link: https://example.com (Type @ to mention)"
+                      className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 text-slate-800"
+                    />
+                    {renderMentionDropdown('firstComment')}
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-slate-600">Timing:</span>
+                      <select
+                        value={currentFirstCommentDelay}
+                        onChange={(e) => updateActiveFirstCommentDelay(Number(e.target.value))}
+                        className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                      >
+                        <option value={0}>Instant (Drop with post)</option>
+                        <option value={5}>Delay by 5 minutes</option>
+                        <option value={15}>Delay by 15 minutes</option>
+                        <option value={30}>Delay by 30 minutes</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 2: Engagement Milestone Comment Triggers */}
+              <div className="bg-white p-6 rounded-2xl border border-amber-200/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                      <ThumbsUp className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">
+                        Engagement Milestone Triggers
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Drop automated comments when reaching like/comment targets
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableMilestones}
+                      onChange={(e) => setEnableMilestones(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                {enableMilestones && (
+                  <div className="pt-3 border-t border-slate-100 space-y-3">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => addMilestone('LIKES', 10)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold border border-amber-200 transition cursor-pointer"
+                      >
+                        + 10 Likes Trigger
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => addMilestone('COMMENTS', 25)}
+                        className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold border border-amber-200 transition cursor-pointer"
+                      >
+                        + 25 Comments Trigger
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {milestones.map((m) => (
+                        <div
+                          key={m.id}
+                          className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3 text-xs"
+                        >
+                          <div className="flex-1 space-y-1">
+                            <div className="flex items-center gap-2 font-bold text-slate-800">
+                              <span>Target:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                value={m.threshold}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setMilestones((prev) =>
+                                    prev.map((item) => (item.id === m.id ? { ...item, threshold: val } : item))
+                                  );
+                                }}
+                                className="w-16 px-1.5 py-0.5 border rounded bg-white"
+                              />
+                              <span>{m.type}</span>
+                            </div>
+                            <input
+                              type="text"
+                              value={m.commentText}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setMilestones((prev) =>
+                                  prev.map((item) => (item.id === m.id ? { ...item, commentText: val } : item))
+                                );
+                              }}
+                              className="w-full px-2 py-1 border rounded bg-white text-slate-800"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeMilestone(m.id)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: Smart Comment Auto-Reply with Tagging */}
+              <div className="bg-white p-6 rounded-2xl border border-violet-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">Auto-Reply to User Comments</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Automatically reply whenever someone leaves a comment
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableAutoReply}
+                      onChange={(e) => setEnableAutoReply(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
+                  </label>
+                </div>
+
+                {enableAutoReply && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2.5 relative">
+                    <div className="p-3 rounded-xl bg-violet-50/80 border border-violet-200 flex items-start gap-2.5 text-xs text-violet-900">
+                      <Bell className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-violet-950">
+                          Smart Commenter Tagging & Instant Notification
+                        </p>
+                        <p className="text-[11px] text-violet-700 mt-0.5 leading-relaxed">
+                          PostCraft will automatically tag the commenter in your reply so Facebook, Instagram & LinkedIn trigger an instant push notification on their phone!
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Reply Message Template
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => quickInsertMentionToField('autoReply', '{name}')}
+                        className="px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-800 text-[11px] font-bold border border-violet-300 transition flex items-center gap-1 cursor-pointer"
+                      >
+                        + Insert {'{name}'} Tag
+                      </button>
+                    </div>
+
+                    <textarea
+                      ref={autoReplyRef}
+                      rows={2}
+                      value={autoReplyText}
+                      onChange={(e) =>
+                        handleInputChangeWithMention('autoReply', e.target.value, e.target.selectionStart)
+                      }
+                      onKeyUp={(e) =>
+                        handleInputChangeWithMention('autoReply', (e.target as any).value, (e.target as any).selectionStart)
+                      }
+                      onClick={(e) =>
+                        handleInputChangeWithMention('autoReply', (e.target as any).value, (e.target as any).selectionStart)
+                      }
+                      placeholder="Hello {name}, thanks for your comment! Check your DM! 🙌 (Type @ to mention)"
+                      className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-500 text-slate-800"
+                    />
+                    {renderMentionDropdown('autoReply')}
+                  </div>
+                )}
+              </div>
+
+              {/* Publishing Schedule & Submit */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPublishMode('now')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      publishMode === 'now'
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Send className="w-4 h-4" /> Publish Now
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPublishMode('schedule')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${
+                      publishMode === 'schedule'
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Calendar className="w-4 h-4" /> Schedule Later
+                  </button>
+                </div>
+
+                {publishMode === 'schedule' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Date & Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      required
+                      value={scheduledAt}
+                      onChange={(e) => setScheduledAt(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={
+                    loading ||
+                    selectedAccountIds.filter((id) => socialAccounts.some((a) => a.id === id)).length === 0 ||
+                    uploadingMedia
+                  }
+                  className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-100 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Publishing...
+                    </>
+                  ) : publishMode === 'now' ? (
+                    <>
+                      <Send className="w-4 h-4" /> Publish Live Post ({selectedAccountIds.filter((id) => socialAccounts.some((a) => a.id === id)).length} Channels)
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4" /> Schedule ({selectedAccountIds.filter((id) => socialAccounts.some((a) => a.id === id)).length} Channels) to Calendar
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
         </form>
 
         {/* Right: Live Mockup Preview (5 cols) */}
