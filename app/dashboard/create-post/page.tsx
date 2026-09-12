@@ -24,7 +24,11 @@ import {
   Instagram,
   Heart,
   Bookmark,
-  MoreHorizontal
+  MoreHorizontal,
+  AtSign,
+  Users,
+  UserCheck,
+  Bell
 } from 'lucide-react';
 
 interface Account {
@@ -89,6 +93,249 @@ export default function CreatePostPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Mention & Tagging states and refs
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const firstCommentRef = useRef<HTMLTextAreaElement>(null);
+  const autoReplyRef = useRef<HTMLTextAreaElement>(null);
+
+  const [mentionState, setMentionState] = useState<{
+    isOpen: boolean;
+    targetField: 'content' | 'firstComment' | 'autoReply' | null;
+    query: string;
+    cursorIndex: number;
+  }>({
+    isOpen: false,
+    targetField: null,
+    query: '',
+    cursorIndex: 0,
+  });
+
+  const AUDIENCE_TAGS = [
+    { tag: '@everyone', name: 'Everyone', desc: 'Notify everyone in group or followers', type: 'audience' },
+    { tag: '@followers', name: 'Followers', desc: 'Notify all active followers of the page', type: 'audience' },
+    { tag: '@topfans', name: 'Top Fans', desc: 'Mention and notify your top fans', type: 'audience' },
+    { tag: '@highlights', name: 'Highlights', desc: 'Highlight update in followers feed', type: 'audience' },
+  ];
+
+  const handleInputChangeWithMention = (
+    field: 'content' | 'firstComment' | 'autoReply',
+    val: string,
+    cursorPos: number
+  ) => {
+    if (field === 'content') setContent(val);
+    else if (field === 'firstComment') setFirstCommentContent(val);
+    else if (field === 'autoReply') setAutoReplyText(val);
+
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const match = textBeforeCursor.match(/@([a-zA-Z0-9_\.]*)$/);
+
+    if (match) {
+      setMentionState({
+        isOpen: true,
+        targetField: field,
+        query: match[1] || '',
+        cursorIndex: cursorPos,
+      });
+    } else {
+      setMentionState((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+    }
+  };
+
+  const insertMention = (mentionTag: string) => {
+    const { targetField, cursorIndex, query } = mentionState;
+    if (!targetField) return;
+
+    const currentVal =
+      targetField === 'content'
+        ? content
+        : targetField === 'firstComment'
+        ? firstCommentContent
+        : autoReplyText;
+
+    const startIndex = cursorIndex - query.length - 1;
+    const before = currentVal.slice(0, Math.max(0, startIndex));
+    const after = currentVal.slice(cursorIndex);
+    const tagWithPrefix = mentionTag.startsWith('@') || mentionTag.startsWith('{') ? mentionTag : `@${mentionTag}`;
+    const newVal = `${before}${tagWithPrefix} ${after}`;
+    const newCursorPos = before.length + tagWithPrefix.length + 1;
+
+    if (targetField === 'content') {
+      setContent(newVal);
+      setTimeout(() => {
+        contentRef.current?.focus();
+        contentRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+      }, 10);
+    } else if (targetField === 'firstComment') {
+      setFirstCommentContent(newVal);
+      setTimeout(() => {
+        firstCommentRef.current?.focus();
+        firstCommentRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+      }, 10);
+    } else if (targetField === 'autoReply') {
+      setAutoReplyText(newVal);
+      setTimeout(() => {
+        autoReplyRef.current?.focus();
+        autoReplyRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+      }, 10);
+    }
+
+    setMentionState({ isOpen: false, targetField: null, query: '', cursorIndex: 0 });
+  };
+
+  const quickInsertMentionToField = (
+    field: 'content' | 'firstComment' | 'autoReply',
+    tag: string
+  ) => {
+    const tagToInsert = tag.startsWith('@') || tag.startsWith('{') ? `${tag} ` : `@${tag} `;
+    if (field === 'content') {
+      setContent((prev) => `${prev ? prev + ' ' : ''}${tagToInsert}`);
+      contentRef.current?.focus();
+    } else if (field === 'firstComment') {
+      setFirstCommentContent((prev) => `${prev ? prev + ' ' : ''}${tagToInsert}`);
+      firstCommentRef.current?.focus();
+    } else if (field === 'autoReply') {
+      setAutoReplyText((prev) => `${prev ? prev + ' ' : ''}${tagToInsert}`);
+      autoReplyRef.current?.focus();
+    }
+  };
+
+  const getFilteredSuggestions = () => {
+    const q = mentionState.query.toLowerCase();
+    const accountSuggestions = accounts.map((acc) => {
+      const cleanHandle = acc.name.replace(/^@/, '').replace(/\s+/g, '');
+      return {
+        tag: `@${cleanHandle}`,
+        name: acc.name,
+        desc: `${acc.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} Account`,
+        avatar: acc.avatar,
+        type: 'account' as const,
+      };
+    });
+
+    const list: Array<{ tag: string; name: string; desc: string; avatar?: string; type: string }> = [
+      ...accountSuggestions,
+      ...AUDIENCE_TAGS,
+    ];
+
+    if (q && !list.some((item) => item.tag.toLowerCase() === `@${q}`)) {
+      list.push({
+        tag: `@${q}`,
+        name: `@${q}`,
+        desc: 'Custom mention handle',
+        avatar: undefined,
+        type: 'custom',
+      });
+    }
+
+    return list.filter(
+      (item) =>
+        item.tag.toLowerCase().includes(q) ||
+        item.name.toLowerCase().includes(q) ||
+        item.desc.toLowerCase().includes(q)
+    );
+  };
+
+  const renderFormattedTextWithMentions = (
+    text: string,
+    platform: 'FACEBOOK' | 'INSTAGRAM' = 'FACEBOOK'
+  ) => {
+    if (!text) return null;
+    const parts = text.split(/(@[a-zA-Z0-9_\.]+|{[a-zA-Z0-9_]+})/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('{') && part.endsWith('}')) {
+        return (
+          <span
+            key={index}
+            className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold text-[11px] border border-violet-200"
+          >
+            {part}
+          </span>
+        );
+      }
+      if (part.startsWith('@')) {
+        return (
+          <span
+            key={index}
+            className={`font-semibold cursor-pointer hover:underline ${
+              platform === 'INSTAGRAM'
+                ? 'text-sky-600 bg-sky-50/70 px-1 py-0.5 rounded'
+                : 'text-blue-600 bg-blue-50/70 px-1 py-0.5 rounded'
+            }`}
+          >
+            {part}
+          </span>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
+  const renderMentionDropdown = (field: 'content' | 'firstComment' | 'autoReply') => {
+    if (!mentionState.isOpen || mentionState.targetField !== field) return null;
+    const suggestions = getFilteredSuggestions();
+
+    return (
+      <div className="absolute left-0 right-0 z-30 mt-1 bg-white rounded-2xl shadow-xl border border-indigo-200 p-2 space-y-1">
+        <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-slate-400 border-b border-slate-100">
+          <span className="flex items-center gap-1.5 text-indigo-600 font-bold">
+            <AtSign className="w-3.5 h-3.5" /> Mention / Tag suggestions
+          </span>
+          <button
+            type="button"
+            onClick={() => setMentionState((prev) => ({ ...prev, isOpen: false }))}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="max-h-52 overflow-y-auto space-y-0.5">
+          {suggestions.length === 0 ? (
+            <p className="p-3 text-xs text-slate-400 text-center">No matching accounts or tags found</p>
+          ) : (
+            suggestions.map((item, i) => (
+              <button
+                key={i}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  insertMention(item.tag);
+                }}
+                className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-indigo-50 text-left transition group cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {item.avatar ? (
+                    <img src={item.avatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                  ) : item.type === 'account' ? (
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-pink-500 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                      @
+                    </div>
+                  ) : item.type === 'audience' ? (
+                    <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                      👥
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                      @
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 truncate">
+                      {item.tag}
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">{item.desc}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-600 flex-shrink-0 transition">
+                  Insert
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
 
   useEffect(() => {
     fetch('/api/accounts')
@@ -300,21 +547,49 @@ export default function CreatePostPage() {
             )}
 
             {/* Post Caption */}
-            <div>
+            <div className="relative">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                   Post Caption
                 </label>
                 <span className="text-xs text-slate-400">{content.length} characters</span>
               </div>
+
+              {/* Quick Mention Toolbar */}
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                  <AtSign className="w-3 h-3 text-indigo-500" /> Mention:
+                </span>
+                {AUDIENCE_TAGS.map((t) => (
+                  <button
+                    key={t.tag}
+                    type="button"
+                    onClick={() => quickInsertMentionToField('content', t.tag)}
+                    className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[11px] font-semibold transition border border-slate-200"
+                  >
+                    {t.tag}
+                  </button>
+                ))}
+              </div>
+
               <textarea
+                ref={contentRef}
                 required
                 rows={4}
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="What would you like to share with your audience? Write your story, announcements, or thoughts here..."
+                onChange={(e) =>
+                  handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
+                }
+                onKeyUp={(e) =>
+                  handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
+                }
+                onClick={(e) =>
+                  handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
+                }
+                placeholder="What would you like to share? Type @ to mention a page, user or audience..."
                 className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed"
               />
+              {renderMentionDropdown('content')}
             </div>
 
             {/* Direct Media Upload (Images & Videos) */}
@@ -400,14 +675,41 @@ export default function CreatePostPage() {
             </div>
 
             {enableFirstComment && (
-              <div className="pt-3 border-t border-slate-100 space-y-3">
+              <div className="pt-3 border-t border-slate-100 space-y-3 relative">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
+                    <AtSign className="w-3 h-3 text-indigo-500" /> Tag:
+                  </span>
+                  {AUDIENCE_TAGS.slice(0, 3).map((t) => (
+                    <button
+                      key={t.tag}
+                      type="button"
+                      onClick={() => quickInsertMentionToField('firstComment', t.tag)}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 text-[10px] font-semibold transition border border-slate-200"
+                    >
+                      {t.tag}
+                    </button>
+                  ))}
+                </div>
+
                 <textarea
+                  ref={firstCommentRef}
                   rows={2}
                   value={firstCommentContent}
-                  onChange={(e) => setFirstCommentContent(e.target.value)}
-                  placeholder="👉 Full tutorial & download link: https://example.com"
+                  onChange={(e) =>
+                    handleInputChangeWithMention('firstComment', e.target.value, e.target.selectionStart)
+                  }
+                  onKeyUp={(e) =>
+                    handleInputChangeWithMention('firstComment', (e.target as any).value, (e.target as any).selectionStart)
+                  }
+                  onClick={(e) =>
+                    handleInputChangeWithMention('firstComment', (e.target as any).value, (e.target as any).selectionStart)
+                  }
+                  placeholder="👉 Full tutorial & download link: https://example.com (Type @ to mention)"
                   className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-indigo-500 text-slate-800"
                 />
+                {renderMentionDropdown('firstComment')}
+
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-semibold text-slate-600">Timing:</span>
                   <select
@@ -560,17 +862,50 @@ export default function CreatePostPage() {
             </div>
 
             {enableAutoReply && (
-              <div className="pt-3 border-t border-slate-100 space-y-2">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Reply Message Template
-                </label>
+              <div className="pt-3 border-t border-slate-100 space-y-2.5 relative">
+                {/* Smart Commenter Notification Info */}
+                <div className="p-3 rounded-xl bg-violet-50/80 border border-violet-200 flex items-start gap-2.5 text-xs text-violet-900">
+                  <Bell className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-violet-950">
+                      Smart Commenter Tagging & Instant Notification
+                    </p>
+                    <p className="text-[11px] text-violet-700 mt-0.5 leading-relaxed">
+                      PostCraft will automatically tag the commenter (e.g. <span className="font-bold text-violet-950 bg-white px-1.5 py-0.5 rounded border border-violet-200">@CommenterName</span>) in your reply so Facebook & Instagram trigger an instant push notification on their phone!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Reply Message Template
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => quickInsertMentionToField('autoReply', '{name}')}
+                    className="px-2.5 py-1 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-800 text-[11px] font-bold border border-violet-300 transition flex items-center gap-1 cursor-pointer"
+                  >
+                    + Insert {'{name}'} Tag
+                  </button>
+                </div>
+
                 <textarea
+                  ref={autoReplyRef}
                   rows={2}
                   value={autoReplyText}
-                  onChange={(e) => setAutoReplyText(e.target.value)}
-                  placeholder="Thanks for commenting! Check your inbox or visit our link..."
+                  onChange={(e) =>
+                    handleInputChangeWithMention('autoReply', e.target.value, e.target.selectionStart)
+                  }
+                  onKeyUp={(e) =>
+                    handleInputChangeWithMention('autoReply', (e.target as any).value, (e.target as any).selectionStart)
+                  }
+                  onClick={(e) =>
+                    handleInputChangeWithMention('autoReply', (e.target as any).value, (e.target as any).selectionStart)
+                  }
+                  placeholder="Hello {name}, thanks for your comment! Check your DM! 🙌 (Type @ to mention)"
                   className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-violet-500 text-slate-800"
                 />
+                {renderMentionDropdown('autoReply')}
               </div>
             )}
           </div>
@@ -733,7 +1068,7 @@ export default function CreatePostPage() {
                         {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
                       </span>
                       <span className="whitespace-pre-wrap">
-                        {content || 'Your post caption will appear here in real time...'}
+                        {renderFormattedTextWithMentions(content || 'Your post caption will appear here in real time...', 'INSTAGRAM')}
                       </span>
                     </div>
 
@@ -747,7 +1082,7 @@ export default function CreatePostPage() {
                           <span className="font-bold mr-1.5 text-slate-900">
                             {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
                           </span>
-                          {firstCommentContent}
+                          {renderFormattedTextWithMentions(firstCommentContent, 'INSTAGRAM')}
                         </p>
                       </div>
                     )}
@@ -809,7 +1144,7 @@ export default function CreatePostPage() {
                     {/* Post Text */}
                     <div className="px-4 pb-3">
                       <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-                        {content || 'Your post caption will appear here in real time...'}
+                        {renderFormattedTextWithMentions(content || 'Your post caption will appear here in real time...', 'FACEBOOK')}
                       </p>
                     </div>
 
@@ -853,7 +1188,7 @@ export default function CreatePostPage() {
                               {selectedAccount?.name || 'Page Name'}
                             </p>
                             <p className="text-xs text-slate-700 whitespace-pre-wrap mt-0.5 leading-relaxed">
-                              {firstCommentContent}
+                              {renderFormattedTextWithMentions(firstCommentContent, 'FACEBOOK')}
                             </p>
                           </div>
                         </div>

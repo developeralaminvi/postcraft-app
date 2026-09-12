@@ -339,6 +339,45 @@ export async function processMilestoneTriggers() {
 }
 
 /**
+ * Format personalized reply text by tagging the commenter with @mention
+ * Ensures commenter receives notification on Facebook / Instagram
+ */
+export function formatPersonalizedReply(
+  template: string,
+  commenterName?: string,
+  isInstagram: boolean = false
+): string {
+  if (!commenterName) {
+    return template.replace(/{(?:name|user)}/gi, '@user').replace(/@user/gi, '@user');
+  }
+
+  // Format mention tag
+  // For Instagram: usernames don't have spaces; if name has spaces, replace with underscores or trim
+  const cleanName = commenterName.trim();
+  const mentionTag = isInstagram
+    ? `@${cleanName.replace(/\s+/g, '_')}`
+    : `@${cleanName}`;
+
+  if (
+    template.includes('{name}') ||
+    template.includes('{user}') ||
+    template.includes('@user')
+  ) {
+    return template
+      .replace(/{name}/gi, mentionTag)
+      .replace(/{user}/gi, mentionTag)
+      .replace(/@user/gi, mentionTag);
+  }
+
+  // If user didn't write placeholder and didn't start with @mention, prepend it
+  if (!template.trim().startsWith(mentionTag)) {
+    return `${mentionTag} ${template.trim()}`;
+  }
+
+  return template;
+}
+
+/**
  * Process Auto-Reply to user comments on posts
  */
 export async function processAutoReplies() {
@@ -386,19 +425,26 @@ export async function processAutoReplies() {
           break;
         }
 
+        // Format personalized reply with commenter @mention
+        const personalizedMessage = formatPersonalizedReply(
+          post.autoReply.replyText,
+          comment.fromName,
+          isInstagram
+        );
+
         // Reply to user comment
         let replyRes;
         if (isInstagram) {
           replyRes = await replyToInstagramComment({
             commentId: comment.id,
             accessToken: post.account.accessToken,
-            message: post.autoReply.replyText,
+            message: personalizedMessage,
           });
         } else {
           replyRes = await replyToComment({
             commentId: comment.id,
             accessToken: post.account.accessToken,
-            message: post.autoReply.replyText,
+            message: personalizedMessage,
           });
         }
 
