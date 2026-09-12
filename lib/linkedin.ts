@@ -58,15 +58,31 @@ export async function verifyLinkedInAccount(
   }
 
   try {
-    const isOrg = authorUrn.includes('organization');
+    let cleanedUrn = authorUrn.trim();
+    // 1. Auto-extract numeric ID if user pasted a full company URL
+    const urlMatch = cleanedUrn.match(/\/company\/(\d+)/);
+    if (urlMatch) {
+      cleanedUrn = `urn:li:organization:${urlMatch[1]}`;
+    }
+
+    // 2. Auto-detect if user entered just numeric digits (e.g. 12345678)
+    const isPureDigits = /^\d+$/.test(cleanedUrn);
+    if (isPureDigits) {
+      cleanedUrn = `urn:li:organization:${cleanedUrn}`;
+    }
+
+    const isOrg = cleanedUrn.includes('organization');
     let name = 'LinkedIn Member';
     let avatar: string | null = null;
     let headline = 'Professional on LinkedIn';
+    let resolvedId = cleanedUrn;
 
     if (isOrg) {
       // Organization / Company Page
-      const orgIdMatch = authorUrn.match(/organization:(\d+)/);
-      const orgId = orgIdMatch ? orgIdMatch[1] : authorUrn;
+      const orgIdMatch = cleanedUrn.match(/organization:(\d+)/);
+      const orgId = orgIdMatch ? orgIdMatch[1] : cleanedUrn;
+      resolvedId = `urn:li:organization:${orgId}`;
+
       const res = await fetch(`${LINKEDIN_API_BASE}/v2/organizations/${orgId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -77,7 +93,7 @@ export async function verifyLinkedInAccount(
       if (!res.ok || data.status >= 400) {
         return {
           success: false,
-          error: data.message || 'Failed to verify LinkedIn Company Page credentials.',
+          error: data.message || 'Failed to verify LinkedIn Company Page credentials. Make sure you have admin rights and w_organization_social scope.',
         };
       }
       name = data.localizedName || data.vanityName || 'LinkedIn Company Page';
@@ -99,12 +115,18 @@ export async function verifyLinkedInAccount(
       name = data.name || `${data.given_name || ''} ${data.family_name || ''}`.trim() || 'LinkedIn Member';
       avatar = data.picture || null;
       headline = 'Member Profile on LinkedIn';
+      const personSub = data.sub || data.id;
+      if (personSub) {
+        resolvedId = `urn:li:person:${personSub}`;
+      } else if (!resolvedId.startsWith('urn:li:')) {
+        resolvedId = `urn:li:person:${resolvedId}`;
+      }
     }
 
     return {
       success: true,
       data: {
-        id: authorUrn.startsWith('urn:li:') ? authorUrn : isOrg ? `urn:li:organization:${authorUrn}` : `urn:li:person:${authorUrn}`,
+        id: resolvedId,
         name,
         avatar,
         headline,
@@ -144,6 +166,8 @@ export async function publishLinkedInPost(params: PublishLinkedInPostParams): Pr
   try {
     const formattedAuthor = authorUrn.startsWith('urn:li:')
       ? authorUrn
+      : /^\d+$/.test(authorUrn)
+      ? `urn:li:organization:${authorUrn}`
       : `urn:li:person:${authorUrn}`;
 
     let publicMediaUrl = mediaUrl;

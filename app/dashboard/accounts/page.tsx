@@ -258,7 +258,7 @@ export default function AccountsPage() {
               />
               <p className="text-[11px] text-slate-400 mt-1">
                 {platform === 'LINKEDIN'
-                  ? 'ব্যক্তিগত প্রোফাইলের জন্য urn:li:person:... অথবা কোম্পানির জন্য urn:li:organization:...'
+                  ? 'কোম্পানি পেজ কানেক্ট করতে পেজের আইডি সংখ্যা (যেমন: 12345678) অথবা লিঙ্ক দিন। ব্যক্তিগত প্রোফাইলের জন্য me লিখুন।'
                   : platform === 'INSTAGRAM'
                   ? 'আপনার Instagram Business বা Creator অ্যাকাউন্টের আইডি'
                   : 'ফেসবুক পেজ আইডি অথবা ব্যক্তিগত অ্যাকাউন্টের জন্য সরাসরি me লিখুন'}
@@ -568,16 +568,27 @@ export default function AccountsPage() {
                     </a>
                   </div>
 
-                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
-                      ব্যক্তিগত প্রোফাইল ও কোম্পানি পেজের জন্য নিয়ম:
+                      ১. ব্যক্তিগত প্রোফাইল (Personal Profile):
+                    </p>
+                    <p className="text-slate-600 pl-3.5">
+                      ব্যক্তিগত প্রোফাইলের জন্য কোনো কঠিন আইডি লাগবে না—আইডির ঘরে শুধু <code className="px-1.5 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">me</code> লিখুন এবং আপনার জেনারেট করা Access Token দিয়ে কানেক্ট চাপুন।
+                    </p>
+
+                    <div className="pt-2 border-t border-slate-100"></div>
+
+                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
+                      ২. কোম্পানি পেজ আইডি (Company Page ID) কোথায় পাবেন:
                     </p>
                     <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
-                      <li>LinkedIn Developer Portal-এ একটি App তৈরি করুন।</li>
-                      <li>Products ট্যাব থেকে <strong>Share on LinkedIn</strong> এবং <strong>Sign In with LinkedIn using OpenID</strong> যোগ করুন।</li>
-                      <li>OAuth 2.0 টোকেন জেনারেটরে যান এবং <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_member_social</code> (ব্যক্তিগত প্রোফাইলের জন্য) অথবা <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_organization_social</code> (কোম্পানি পেজের জন্য) সিলেক্ট করে টোকেন নিন।</li>
-                      <li>আইডি হিসেবে পার্সোনাল প্রোফাইলের ক্ষেত্রে <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">me</code> বা Member URN দিন; আর কোম্পানি পেজের ক্ষেত্রে Organization URN (<code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">urn:li:organization:...</code>) দিয়ে কানেক্ট করুন।</li>
+                      <li>লিঙ্কডইনে লগইন করে আপনার কোম্পানি পেজের <strong>Admin View</strong>-তে যান।</li>
+                      <li>ব্রাউজারের অ্যাড্রেস বারের লিঙ্কটি খেয়াল করুন: <code className="px-1 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">linkedin.com/company/<strong>12345678</strong>/admin/...</code></li>
+                      <li>এখানে <code className="px-1 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">/company/</code> এর ঠিক পরের <strong>সংখ্যাটি (যেমন: 12345678)</strong> হলো আপনার পেজ আইডি!</li>
+                      <li>আপনি সরাসরি এই সংখ্যাটি অথবা পুরো পেজের লিঙ্কটি আমাদের আইডি ঘরে পেস্ট করতে পারেন (সিস্টেম অটোমেটিক আইডি চিনে নিবে)।</li>
+                      <li>টোকেন নেওয়ার সময় <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_organization_social</code> পারমিশন সিলেক্ট করে টোকেন নিন।</li>
                     </ol>
                   </div>
                 </div>
