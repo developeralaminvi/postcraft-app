@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import ChannelAvatar from '@/components/ChannelAvatar';
 import {
   Send,
   Calendar,
@@ -23,6 +24,7 @@ import {
   X,
   Instagram,
   Linkedin,
+  Facebook,
   Heart,
   Bookmark,
   MoreHorizontal,
@@ -31,13 +33,17 @@ import {
   UserCheck,
   Bell,
   BadgeCheck,
-  UserPlus
+  UserPlus,
+  RotateCcw,
+  Check,
+  Layers,
+  Edit3,
 } from 'lucide-react';
 
 interface Account {
   id: string;
   name: string;
-  avatar?: string;
+  avatar?: string | null;
   accountId: string;
   platform: string;
 }
@@ -49,32 +55,48 @@ interface MilestoneInput {
   commentText: string;
 }
 
+interface ChannelCustomization {
+  isCustomized: boolean;
+  content: string;
+  mediaUrl: string;
+  mediaType: 'TEXT' | 'IMAGE' | 'VIDEO';
+  enableFirstComment: boolean;
+  firstCommentContent: string;
+  firstCommentDelay: number;
+}
+
 export default function CreatePostPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [content, setContent] = useState('');
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'MASTER' | string>('MASTER');
 
-  // Media state
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaType, setMediaType] = useState<'TEXT' | 'IMAGE' | 'VIDEO'>('TEXT');
+  // Master Post States
+  const [masterContent, setMasterContent] = useState('');
+  const [masterMediaUrl, setMasterMediaUrl] = useState('');
+  const [masterMediaType, setMasterMediaType] = useState<'TEXT' | 'IMAGE' | 'VIDEO'>('TEXT');
+  const [masterEnableFirstComment, setMasterEnableFirstComment] = useState(true);
+  const [masterFirstCommentContent, setMasterFirstCommentContent] = useState('');
+  const [masterFirstCommentDelay, setMasterFirstCommentDelay] = useState<number>(0);
+
+  // Per-channel Customizations
+  const [customizations, setCustomizations] = useState<Record<string, ChannelCustomization>>({});
+
+  // Media upload indicator
   const [uploadingMedia, setUploadingMedia] = useState(false);
 
   // Publishing state
   const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
   const [scheduledAt, setScheduledAt] = useState('');
 
-  // First Comment state
-  const [enableFirstComment, setEnableFirstComment] = useState(true);
-  const [firstCommentContent, setFirstCommentContent] = useState('');
-  const [firstCommentDelay, setFirstCommentDelay] = useState<number>(0);
-
-  // Auto-Reply state
+  // Auto-Reply state (Smart Commenter Tagging)
   const [enableAutoReply, setEnableAutoReply] = useState(false);
-  const [autoReplyText, setAutoReplyText] = useState('Thanks for checking this out! Send us a DM or visit our page for more details! 🙌');
+  const [autoReplyText, setAutoReplyText] = useState(
+    'Thanks for checking this out! Send us a DM or visit our page for more details! 🙌'
+  );
 
   // Milestone Triggers state
   const [milestones, setMilestones] = useState<MilestoneInput[]>([
@@ -96,6 +118,9 @@ export default function CreatePostPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Preview target state when in Master tab
+  const [previewAccountId, setPreviewAccountId] = useState<string>('');
 
   // Mention & Tagging states and refs
   const contentRef = useRef<HTMLTextAreaElement>(null);
@@ -349,13 +374,171 @@ export default function CreatePostPage() {
     rect: { top: number; left: number };
   } | null>(null);
 
+  // Active Tab & Customization Helpers
+  const isMaster = activeTab === 'MASTER';
+  const activeAccount = accounts.find((a) => a.id === activeTab) || null;
+
+  const getEffectiveChannelData = (accId: string): ChannelCustomization => {
+    const custom = customizations[accId];
+    if (custom && custom.isCustomized) {
+      return custom;
+    }
+    return {
+      isCustomized: false,
+      content: masterContent,
+      mediaUrl: masterMediaUrl,
+      mediaType: masterMediaType,
+      enableFirstComment: masterEnableFirstComment,
+      firstCommentContent: masterFirstCommentContent,
+      firstCommentDelay: masterFirstCommentDelay,
+    };
+  };
+
+  // Current values based on active tab
+  const currentContent = isMaster
+    ? masterContent
+    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].content : masterContent);
+
+  const currentMediaUrl = isMaster
+    ? masterMediaUrl
+    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].mediaUrl : masterMediaUrl);
+
+  const currentMediaType = isMaster
+    ? masterMediaType
+    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].mediaType : masterMediaType);
+
+  const currentEnableFirstComment = isMaster
+    ? masterEnableFirstComment
+    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].enableFirstComment : masterEnableFirstComment);
+
+  const currentFirstCommentContent = isMaster
+    ? masterFirstCommentContent
+    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].firstCommentContent : masterFirstCommentContent);
+
+  const currentFirstCommentDelay = isMaster
+    ? masterFirstCommentDelay
+    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].firstCommentDelay : masterFirstCommentDelay);
+
+  // Updaters for active content
+  const updateActiveContent = (val: string) => {
+    if (isMaster) {
+      setMasterContent(val);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            content: val,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveMedia = (url: string, type: 'TEXT' | 'IMAGE' | 'VIDEO') => {
+    if (isMaster) {
+      setMasterMediaUrl(url);
+      setMasterMediaType(type);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            mediaUrl: url,
+            mediaType: type,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const removeActiveMedia = () => {
+    updateActiveMedia('', 'TEXT');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const updateActiveFirstCommentEnabled = (enabled: boolean) => {
+    if (isMaster) {
+      setMasterEnableFirstComment(enabled);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            enableFirstComment: enabled,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveFirstCommentContent = (val: string) => {
+    if (isMaster) {
+      setMasterFirstCommentContent(val);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            firstCommentContent: val,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const updateActiveFirstCommentDelay = (delay: number) => {
+    if (isMaster) {
+      setMasterFirstCommentDelay(delay);
+    } else {
+      setCustomizations((prev) => {
+        const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
+        return {
+          ...prev,
+          [activeTab]: {
+            ...existing,
+            firstCommentDelay: delay,
+            isCustomized: true,
+          },
+        };
+      });
+    }
+  };
+
+  const resetChannelToMaster = (accId: string) => {
+    setCustomizations((prev) => ({
+      ...prev,
+      [accId]: {
+        isCustomized: false,
+        content: masterContent,
+        mediaUrl: masterMediaUrl,
+        mediaType: masterMediaType,
+        enableFirstComment: masterEnableFirstComment,
+        firstCommentContent: masterFirstCommentContent,
+        firstCommentDelay: masterFirstCommentDelay,
+      },
+    }));
+  };
+
   const handleInputChangeWithMention = (
     field: 'content' | 'firstComment' | 'autoReply',
     val: string,
     cursorPos: number
   ) => {
-    if (field === 'content') setContent(val);
-    else if (field === 'firstComment') setFirstCommentContent(val);
+    if (field === 'content') updateActiveContent(val);
+    else if (field === 'firstComment') updateActiveFirstCommentContent(val);
     else if (field === 'autoReply') setAutoReplyText(val);
 
     const textBeforeCursor = val.slice(0, cursorPos);
@@ -379,9 +562,9 @@ export default function CreatePostPage() {
 
     const currentVal =
       targetField === 'content'
-        ? content
+        ? currentContent
         : targetField === 'firstComment'
-        ? firstCommentContent
+        ? currentFirstCommentContent
         : autoReplyText;
 
     const startIndex = cursorIndex - query.length - 1;
@@ -392,13 +575,13 @@ export default function CreatePostPage() {
     const newCursorPos = before.length + tagWithPrefix.length + 1;
 
     if (targetField === 'content') {
-      setContent(newVal);
+      updateActiveContent(newVal);
       setTimeout(() => {
         contentRef.current?.focus();
         contentRef.current?.setSelectionRange(newCursorPos, newCursorPos);
       }, 10);
     } else if (targetField === 'firstComment') {
-      setFirstCommentContent(newVal);
+      updateActiveFirstCommentContent(newVal);
       setTimeout(() => {
         firstCommentRef.current?.focus();
         firstCommentRef.current?.setSelectionRange(newCursorPos, newCursorPos);
@@ -420,10 +603,10 @@ export default function CreatePostPage() {
   ) => {
     const tagToInsert = tag.startsWith('@') || tag.startsWith('{') ? `${tag} ` : `@${tag} `;
     if (field === 'content') {
-      setContent((prev) => `${prev ? prev + ' ' : ''}${tagToInsert}`);
+      updateActiveContent(`${currentContent ? currentContent + ' ' : ''}${tagToInsert}`);
       contentRef.current?.focus();
     } else if (field === 'firstComment') {
-      setFirstCommentContent((prev) => `${prev ? prev + ' ' : ''}${tagToInsert}`);
+      updateActiveFirstCommentContent(`${currentFirstCommentContent ? currentFirstCommentContent + ' ' : ''}${tagToInsert}`);
       firstCommentRef.current?.focus();
     } else if (field === 'autoReply') {
       setAutoReplyText((prev) => `${prev ? prev + ' ' : ''}${tagToInsert}`);
@@ -431,9 +614,11 @@ export default function CreatePostPage() {
     }
   };
 
+  // Filter mention suggestions based on active context
   const getFilteredSuggestions = (): MentionProfile[] => {
-    const isLinkedIn = selectedAccount?.platform === 'LINKEDIN';
-    const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
+    const currentPlatform = activeAccount?.platform || 'FACEBOOK';
+    const isLinkedIn = currentPlatform === 'LINKEDIN';
+    const isInstagram = currentPlatform === 'INSTAGRAM';
     const q = mentionState.query.toLowerCase();
 
     // 1. Dynamic accounts connected by user
@@ -463,7 +648,6 @@ export default function CreatePostPage() {
 
     const allProfiles = [...userConnectedAccounts, ...platformProfiles];
 
-    // 3. If query typed, filter; if no exact match, add custom tag
     let list = allProfiles;
     if (q) {
       list = allProfiles.filter(
@@ -566,13 +750,13 @@ export default function CreatePostPage() {
 
   const renderMentionDropdown = (field: 'content' | 'firstComment' | 'autoReply') => {
     if (!mentionState.isOpen || mentionState.targetField !== field) return null;
-    const isLinkedIn = selectedAccount?.platform === 'LINKEDIN';
-    const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
+    const currentPlatform = activeAccount?.platform || 'FACEBOOK';
+    const isLinkedIn = currentPlatform === 'LINKEDIN';
+    const isInstagram = currentPlatform === 'INSTAGRAM';
     const suggestions = getFilteredSuggestions();
 
     return (
       <div className="absolute left-0 right-0 z-30 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-        {/* Header customized for Facebook, Instagram, or LinkedIn */}
         <div
           className={`p-3 border-b flex items-center justify-between ${
             isLinkedIn
@@ -623,7 +807,6 @@ export default function CreatePostPage() {
           </button>
         </div>
 
-        {/* Profile List */}
         <div className="max-h-64 overflow-y-auto p-1.5 space-y-1">
           {suggestions.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-400">
@@ -647,56 +830,35 @@ export default function CreatePostPage() {
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {/* Avatar rendering */}
-                  {item.avatar ? (
-                    <div
-                      className={`relative flex-shrink-0 ${
-                        isInstagram
-                          ? 'p-[1.5px] rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600'
-                          : ''
-                      }`}
-                    >
-                      <img
-                        src={item.avatar}
-                        alt={item.name}
-                        className={`w-9 h-9 rounded-full object-cover ${
-                          isInstagram ? 'border border-white' : 'border border-slate-200'
-                        }`}
-                      />
-                      {item.verified && !isInstagram && (
-                        <div
-                          className={`absolute -bottom-0.5 -right-0.5 text-white rounded-full p-0.5 shadow-xs ${
-                            isLinkedIn ? 'bg-[#0A66C2]' : 'bg-blue-600'
+                  <div className="relative flex-shrink-0">
+                    <img
+                      src={item.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                      alt={item.name}
+                      className="w-10 h-10 rounded-full object-cover border border-slate-200 group-hover:scale-105 transition"
+                    />
+                    {item.verified && (
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-xs">
+                        <BadgeCheck
+                          className={`w-3.5 h-3.5 ${
+                            isLinkedIn
+                              ? 'text-[#0A66C2] fill-[#0A66C2] text-white'
+                              : isInstagram
+                              ? 'text-sky-500 fill-sky-500 text-white'
+                              : 'text-blue-600 fill-blue-600 text-white'
                           }`}
-                        >
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                        </div>
-                      )}
-                    </div>
-                  ) : item.type === 'audience' ? (
-                    <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      👥
-                    </div>
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                      @
-                    </div>
-                  )}
+                        />
+                      </div>
+                    )}
+                  </div>
 
-                  {/* Profile Details */}
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
-                        {isInstagram ? item.tag : item.name}
+                      <p className="font-semibold text-xs text-slate-900 group-hover:text-indigo-600 transition truncate">
+                        {item.name}
                       </p>
-                      {item.connections && (
-                        <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                          {item.connections}
-                        </span>
-                      )}
                       {item.verified && (
                         <BadgeCheck
-                          className={`w-3.5 h-3.5 flex-shrink-0 ${
+                          className={`w-3 h-3 flex-shrink-0 ${
                             isLinkedIn
                               ? 'text-[#0A66C2] fill-[#0A66C2] text-white'
                               : isInstagram
@@ -712,7 +874,6 @@ export default function CreatePostPage() {
                   </div>
                 </div>
 
-                {/* Right side Tag & Insert badge */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-700">
                     {item.tag}
@@ -737,13 +898,16 @@ export default function CreatePostPage() {
     );
   };
 
+  // Load accounts on mount
   useEffect(() => {
     fetch('/api/accounts')
       .then((res) => res.json())
       .then((data) => {
         if (data.accounts && data.accounts.length > 0) {
           setAccounts(data.accounts);
-          setSelectedAccountId(data.accounts[0].id);
+          const allIds = data.accounts.map((a: Account) => a.id);
+          setSelectedAccountIds(allIds);
+          setPreviewAccountId(data.accounts[0].id);
         }
       })
       .catch(console.error);
@@ -758,8 +922,6 @@ export default function CreatePostPage() {
       setScheduledAt(d.toISOString().slice(0, 16));
     }
   }, [searchParams]);
-
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
 
   // Direct File Upload Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -784,8 +946,7 @@ export default function CreatePostPage() {
         return;
       }
 
-      setMediaUrl(data.url);
-      setMediaType(data.mediaType);
+      updateActiveMedia(data.url, data.mediaType);
     } catch (err: any) {
       setError(err?.message || 'Network error during upload');
     } finally {
@@ -793,10 +954,32 @@ export default function CreatePostPage() {
     }
   };
 
-  const removeMedia = () => {
-    setMediaUrl('');
-    setMediaType('TEXT');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  // Toggle account selection
+  const toggleAccountSelection = (accId: string) => {
+    setSelectedAccountIds((prev) => {
+      let next: string[];
+      if (prev.includes(accId)) {
+        if (prev.length === 1) return prev; // Keep at least one selected
+        next = prev.filter((id) => id !== accId);
+        if (activeTab === accId) {
+          setActiveTab('MASTER');
+        }
+      } else {
+        next = [...prev, accId];
+      }
+      return next;
+    });
+  };
+
+  const selectAllAccounts = () => {
+    setSelectedAccountIds(accounts.map((a) => a.id));
+  };
+
+  const clearAccountSelection = () => {
+    if (accounts.length > 0) {
+      setSelectedAccountIds([accounts[0].id]);
+      setActiveTab('MASTER');
+    }
   };
 
   const addMilestone = (type: 'LIKES' | 'COMMENTS', threshold: number) => {
@@ -815,48 +998,75 @@ export default function CreatePostPage() {
     setMilestones(milestones.filter((m) => m.id !== id));
   };
 
+  // Form Submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
-    const targetAccount = accounts.find((a) => a.id === selectedAccountId);
-    const isLinkedIn = targetAccount?.platform === 'LINKEDIN';
-    const isInstagram = targetAccount?.platform === 'INSTAGRAM';
-
-    if (!selectedAccountId) {
-      setError('Please select or connect a social account first.');
+    if (selectedAccountIds.length === 0) {
+      setError('Please select at least one social channel to publish to.');
       return;
     }
 
-    if (isInstagram && !mediaUrl) {
-      setError('Instagram posts require an image or video attachment. Please upload an image or video above before publishing.');
-      return;
-    }
-
-    if (!content.trim()) {
-      setError('Post caption cannot be empty.');
-      return;
+    // Check Instagram media requirements across selected accounts
+    for (const accId of selectedAccountIds) {
+      const acc = accounts.find((a) => a.id === accId);
+      if (acc?.platform === 'INSTAGRAM') {
+        const eff = getEffectiveChannelData(accId);
+        if (!eff.mediaUrl) {
+          setError(
+            `Instagram account "${acc.name}" requires an image or video attachment. Please attach media either in the Master tab or directly on the Instagram tab.`
+          );
+          return;
+        }
+      }
+      const eff = getEffectiveChannelData(accId);
+      if (!eff.content.trim()) {
+        setError(`Post caption for "${acc?.name || 'Selected account'}" cannot be empty.`);
+        return;
+      }
     }
 
     setLoading(true);
 
     try {
+      // Build customizations payload for accounts with custom edits
+      const customPayload: Record<string, any> = {};
+      selectedAccountIds.forEach((accId) => {
+        const c = customizations[accId];
+        if (c && c.isCustomized) {
+          customPayload[accId] = {
+            isCustomized: true,
+            content: c.content.trim(),
+            mediaUrl: c.mediaUrl.trim() || undefined,
+            mediaType: c.mediaType,
+            autoComment: c.enableFirstComment && c.firstCommentContent.trim()
+              ? {
+                  enabled: true,
+                  content: c.firstCommentContent.trim(),
+                  delayMinutes: c.firstCommentDelay,
+                }
+              : undefined,
+          };
+        }
+      });
+
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          accountId: selectedAccountId,
-          content,
-          mediaUrl: mediaUrl.trim() || undefined,
-          mediaType: mediaType,
+          accountIds: selectedAccountIds,
+          content: masterContent,
+          mediaUrl: masterMediaUrl.trim() || undefined,
+          mediaType: masterMediaType,
           publishNow: publishMode === 'now',
           scheduledAt: publishMode === 'schedule' ? scheduledAt : undefined,
-          autoComment: enableFirstComment && firstCommentContent.trim()
+          autoComment: masterEnableFirstComment && masterFirstCommentContent.trim()
             ? {
                 enabled: true,
-                content: firstCommentContent.trim(),
-                delayMinutes: firstCommentDelay,
+                content: masterFirstCommentContent.trim(),
+                delayMinutes: masterFirstCommentDelay,
               }
             : undefined,
           autoReply: enableAutoReply && autoReplyText.trim()
@@ -866,6 +1076,7 @@ export default function CreatePostPage() {
               }
             : undefined,
           milestoneTriggers: enableMilestones ? milestones : [],
+          customizations: customPayload,
         }),
       });
 
@@ -878,8 +1089,8 @@ export default function CreatePostPage() {
 
       setSuccess(
         publishMode === 'now'
-          ? `Post published to ${isLinkedIn ? 'LinkedIn' : isInstagram ? 'Instagram' : 'Facebook'} successfully!`
-          : 'Post scheduled successfully!'
+          ? `Successfully published to ${selectedAccountIds.length} channel${selectedAccountIds.length > 1 ? 's' : ''}!`
+          : `Post scheduled across ${selectedAccountIds.length} channel${selectedAccountIds.length > 1 ? 's' : ''} successfully!`
       );
 
       setTimeout(() => {
@@ -893,72 +1104,231 @@ export default function CreatePostPage() {
     }
   };
 
+  // Preview account determination
+  const previewAccount = isMaster
+    ? accounts.find((a) => a.id === previewAccountId) ||
+      accounts.find((a) => selectedAccountIds.includes(a.id)) ||
+      accounts[0]
+    : activeAccount;
+
+  const previewData = previewAccount ? getEffectiveChannelData(previewAccount.id) : null;
+  const previewPlatform = previewAccount?.platform || 'FACEBOOK';
+  const isPreviewLinkedIn = previewPlatform === 'LINKEDIN';
+  const isPreviewInstagram = previewPlatform === 'INSTAGRAM';
+
   return (
     <div className="space-y-8 max-w-6xl">
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Post Composer Studio</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Upload media, schedule content, and configure intelligent comment automations.
+          Select multiple channels to design posts all at once, customize per channel, and publish seamlessly.
         </p>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-3 text-sm text-rose-800">
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center gap-3 text-sm text-rose-800 animate-in fade-in">
           <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-3 text-sm text-emerald-800">
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-3 text-sm text-emerald-800 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
           <span>{success}</span>
         </div>
       )}
 
+      {/* TOP CHANNEL SELECTOR BAR (Postiz Style) */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Select Channels to Publish
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-100">
+              {selectedAccountIds.length} of {accounts.length} Selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={selectAllAccounts}
+              className="font-semibold text-indigo-600 hover:text-indigo-800 transition px-2 py-1 rounded-md hover:bg-indigo-50"
+            >
+              Select All
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={clearAccountSelection}
+              className="font-medium text-slate-500 hover:text-slate-700 transition px-2 py-1 rounded-md hover:bg-slate-100"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        {accounts.length === 0 ? (
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+            <span>No Facebook, Instagram, or LinkedIn account connected yet.</span>
+            <a href="/dashboard/accounts" className="font-semibold underline text-amber-900">
+              Connect Account
+            </a>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            {accounts.map((acc) => {
+              const isSelected = selectedAccountIds.includes(acc.id);
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => toggleAccountSelection(acc.id)}
+                  className={`group relative flex items-center gap-3 p-2 pr-3.5 rounded-2xl border transition text-left cursor-pointer ${
+                    isSelected
+                      ? 'border-indigo-500 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/20'
+                      : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 opacity-60 hover:opacity-90'
+                  }`}
+                >
+                  <div className="relative">
+                    <ChannelAvatar
+                      avatar={acc.avatar}
+                      name={acc.name}
+                      platform={acc.platform}
+                      size="md"
+                    />
+                    {isSelected && (
+                      <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xs border-2 border-white">
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-bold truncate max-w-[130px] ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                      {acc.name}
+                    </p>
+                    <p className="text-[10px] text-slate-400 capitalize">
+                      {acc.platform.toLowerCase()}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* DUAL-LEVEL EDITOR TABS: Master Tab & Per-Channel Customization Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-200">
+        {/* Tab 1: Master Tab */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('MASTER')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition flex-shrink-0 cursor-pointer ${
+            isMaster
+              ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/90'
+          }`}
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span>All Selected Channels</span>
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+              isMaster ? 'bg-indigo-700/80 text-white' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {selectedAccountIds.length}
+          </span>
+        </button>
+
+        {/* Tab 2..N: Individual Selected Channel Tabs */}
+        {selectedAccountIds.map((accId) => {
+          const acc = accounts.find((a) => a.id === accId);
+          if (!acc) return null;
+          const isActive = activeTab === accId;
+          const isCustom = !!customizations[accId]?.isCustomized;
+
+          return (
+            <button
+              key={accId}
+              type="button"
+              onClick={() => setActiveTab(accId)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition flex-shrink-0 cursor-pointer border ${
+                isActive
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border-slate-200/90'
+              }`}
+            >
+              <ChannelAvatar
+                avatar={acc.avatar}
+                name={acc.name}
+                platform={acc.platform}
+                size="xs"
+                showBadge={true}
+              />
+              <span className="truncate max-w-[120px]">{acc.name}</span>
+              {isCustom && (
+                <span
+                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                    isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  Customized
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Composer Form (7 cols) */}
         <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
-          {/* Target Account */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Publishing Account
-            </label>
-
-            {accounts.length === 0 ? (
-              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
-                <span>No Facebook Page, Instagram, or LinkedIn Account connected yet.</span>
-                <a href="/dashboard/accounts" className="font-semibold underline text-amber-900">
-                  Connect Account
-                </a>
+          {/* Active Channel Customization Notification Banner */}
+          {!isMaster && activeAccount && (
+            <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <ChannelAvatar
+                  avatar={activeAccount.avatar}
+                  name={activeAccount.name}
+                  platform={activeAccount.platform}
+                  size="sm"
+                />
+                <div className="min-w-0">
+                  <p className="font-bold truncate">
+                    Customizing exclusively for {activeAccount.name} ({activeAccount.platform})
+                  </p>
+                  <p className="text-[11px] text-amber-700">
+                    Changes made here override the master post content for this channel only.
+                  </p>
+                </div>
               </div>
-            ) : (
-              <select
-                value={selectedAccountId}
-                onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 bg-white"
-              >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.platform === 'LINKEDIN'
-                      ? '💼 LinkedIn'
-                      : acc.platform === 'INSTAGRAM'
-                      ? '📸 Instagram'
-                      : '🌐 Facebook'}
-                    : {acc.name} ({acc.accountId})
-                  </option>
-                ))}
-              </select>
-            )}
 
+              {customizations[activeAccount.id]?.isCustomized && (
+                <button
+                  type="button"
+                  onClick={() => resetChannelToMaster(activeAccount.id)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition text-[11px] flex-shrink-0 cursor-pointer shadow-2xs"
+                  title="Revert to master caption and media"
+                >
+                  <RotateCcw className="w-3 h-3" /> Reset to Master
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Composer Main Box */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             {/* Post Caption */}
             <div className="relative">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  Post Caption
+                  {isMaster ? 'Master Post Caption' : `${activeAccount?.name} Caption`}
                 </label>
-                <span className="text-xs text-slate-400">{content.length} characters</span>
+                <span className="text-xs text-slate-400">{currentContent.length} characters</span>
               </div>
 
               {/* Quick Mention Toolbar */}
@@ -982,7 +1352,7 @@ export default function CreatePostPage() {
                 ref={contentRef}
                 required
                 rows={4}
-                value={content}
+                value={currentContent}
                 onChange={(e) =>
                   handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
                 }
@@ -992,19 +1362,30 @@ export default function CreatePostPage() {
                 onClick={(e) =>
                   handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
                 }
-                placeholder="What would you like to share? Type @ to mention a page, user or audience..."
-                className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed"
+                placeholder={
+                  isMaster
+                    ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
+                    : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
+                }
+                className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed text-slate-900"
               />
               {renderMentionDropdown('content')}
             </div>
 
             {/* Direct Media Upload (Images & Videos) */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                Media Attachment (Direct Upload: Image or Video)
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  {isMaster ? 'Master Media Attachment' : `${activeAccount?.name} Media Attachment`}
+                </label>
+                {activeAccount?.platform === 'INSTAGRAM' && (
+                  <span className="text-[10px] font-bold text-pink-600 bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
+                    Media Required for Instagram
+                  </span>
+                )}
+              </div>
 
-              {!mediaUrl ? (
+              {!currentMediaUrl ? (
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
@@ -1034,21 +1415,21 @@ export default function CreatePostPage() {
                 </div>
               ) : (
                 <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group">
-                  {mediaType === 'VIDEO' ? (
-                    <video src={mediaUrl} controls className="w-full max-h-64 object-cover" />
+                  {currentMediaType === 'VIDEO' ? (
+                    <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
                   ) : (
-                    <img src={mediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
+                    <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
                   )}
                   <button
                     type="button"
-                    onClick={removeMedia}
+                    onClick={removeActiveMedia}
                     className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-white transition shadow-md"
                     title="Remove media"
                   >
                     <X className="w-4 h-4" />
                   </button>
                   <span className="absolute bottom-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900/80 text-white uppercase tracking-wider">
-                    {mediaType} Attached
+                    {currentMediaType} Attached
                   </span>
                 </div>
               )}
@@ -1063,7 +1444,9 @@ export default function CreatePostPage() {
                   <MessageSquare className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">Automated First Comment</h3>
+                  <h3 className="font-bold text-sm text-slate-900">
+                    {isMaster ? 'Automated First Comment' : `First Comment for ${activeAccount?.name}`}
+                  </h3>
                   <p className="text-[11px] text-slate-500">
                     Instantly drop your link or call-to-action in comment #1
                   </p>
@@ -1072,15 +1455,15 @@ export default function CreatePostPage() {
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={enableFirstComment}
-                  onChange={(e) => setEnableFirstComment(e.target.checked)}
+                  checked={currentEnableFirstComment}
+                  onChange={(e) => updateActiveFirstCommentEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
               </label>
             </div>
 
-            {enableFirstComment && (
+            {currentEnableFirstComment && (
               <div className="pt-3 border-t border-slate-100 space-y-3 relative">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] font-medium text-slate-500 flex items-center gap-1">
@@ -1101,7 +1484,7 @@ export default function CreatePostPage() {
                 <textarea
                   ref={firstCommentRef}
                   rows={2}
-                  value={firstCommentContent}
+                  value={currentFirstCommentContent}
                   onChange={(e) =>
                     handleInputChangeWithMention('firstComment', e.target.value, e.target.selectionStart)
                   }
@@ -1119,8 +1502,8 @@ export default function CreatePostPage() {
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-semibold text-slate-600">Timing:</span>
                   <select
-                    value={firstCommentDelay}
-                    onChange={(e) => setFirstCommentDelay(Number(e.target.value))}
+                    value={currentFirstCommentDelay}
+                    onChange={(e) => updateActiveFirstCommentDelay(Number(e.target.value))}
                     className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
                   >
                     <option value={0}>Instant (Drop with post)</option>
@@ -1156,85 +1539,71 @@ export default function CreatePostPage() {
                   onChange={(e) => setEnableMilestones(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
               </label>
             </div>
 
             {enableMilestones && (
               <div className="pt-3 border-t border-slate-100 space-y-3">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold text-slate-600">Quick Presets:</span>
+                <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => addMilestone('LIKES', 10)}
-                    className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200 hover:bg-amber-100"
+                    className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold border border-amber-200 transition"
                   >
                     + 10 Likes Trigger
                   </button>
                   <button
                     type="button"
-                    onClick={() => addMilestone('COMMENTS', 20)}
-                    className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200 hover:bg-amber-100"
+                    onClick={() => addMilestone('COMMENTS', 25)}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-semibold border border-amber-200 transition"
                   >
-                    + 20 Comments Trigger
+                    + 25 Comments Trigger
                   </button>
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {milestones.map((m, idx) => (
                     <div
                       key={m.id}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2"
+                      className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-start justify-between gap-3 text-xs"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-800">
-                            When post hits:
-                          </span>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2 font-bold text-slate-800">
+                          <span>Target:</span>
                           <input
                             type="number"
                             min="1"
                             value={m.threshold}
                             onChange={(e) => {
-                              const updated = [...milestones];
-                              updated[idx].threshold = Number(e.target.value);
-                              setMilestones(updated);
+                              const val = Number(e.target.value);
+                              setMilestones((prev) =>
+                                prev.map((item) => (item.id === m.id ? { ...item, threshold: val } : item))
+                              );
                             }}
-                            className="w-16 px-2 py-1 text-xs border rounded bg-white font-bold"
+                            className="w-16 px-1.5 py-0.5 border rounded bg-white"
                           />
-                          <select
-                            value={m.type}
-                            onChange={(e) => {
-                              const updated = [...milestones];
-                              updated[idx].type = e.target.value as any;
-                              setMilestones(updated);
-                            }}
-                            className="px-2 py-1 text-xs border rounded bg-white font-semibold"
-                          >
-                            <option value="LIKES">Likes / Reactions</option>
-                            <option value="COMMENTS">Comments</option>
-                          </select>
+                          <span>{m.type}</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeMilestone(m.id)}
-                          className="text-slate-400 hover:text-rose-600 p-1"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <input
+                          type="text"
+                          value={m.commentText}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setMilestones((prev) =>
+                              prev.map((item) => (item.id === m.id ? { ...item, commentText: val } : item))
+                            );
+                          }}
+                          className="w-full px-2 py-1 border rounded bg-white text-slate-800"
+                        />
                       </div>
-
-                      <input
-                        type="text"
-                        value={m.commentText}
-                        onChange={(e) => {
-                          const updated = [...milestones];
-                          updated[idx].commentText = e.target.value;
-                          setMilestones(updated);
-                        }}
-                        placeholder="Write the automated comment to publish..."
-                        className="w-full px-3 py-1.5 text-xs border rounded-lg bg-white"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => removeMilestone(m.id)}
+                        className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1242,8 +1611,8 @@ export default function CreatePostPage() {
             )}
           </div>
 
-          {/* SECTION 3: Auto-Reply to User Comments */}
-          <div className="bg-white p-6 rounded-2xl border border-violet-200/80 shadow-xs space-y-4">
+          {/* SECTION 3: Smart Comment Auto-Reply with Tagging */}
+          <div className="bg-white p-6 rounded-2xl border border-violet-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center">
@@ -1269,7 +1638,6 @@ export default function CreatePostPage() {
 
             {enableAutoReply && (
               <div className="pt-3 border-t border-slate-100 space-y-2.5 relative">
-                {/* Smart Commenter Notification Info */}
                 <div className="p-3 rounded-xl bg-violet-50/80 border border-violet-200 flex items-start gap-2.5 text-xs text-violet-900">
                   <Bell className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
                   <div>
@@ -1277,7 +1645,11 @@ export default function CreatePostPage() {
                       Smart Commenter Tagging & Instant Notification
                     </p>
                     <p className="text-[11px] text-violet-700 mt-0.5 leading-relaxed">
-                      PostCraft will automatically tag the commenter (e.g. <span className="font-bold text-violet-950 bg-white px-1.5 py-0.5 rounded border border-violet-200">@CommenterName</span>) in your reply so Facebook & Instagram trigger an instant push notification on their phone!
+                      PostCraft will automatically tag the commenter (e.g.{' '}
+                      <span className="font-bold text-violet-950 bg-white px-1.5 py-0.5 rounded border border-violet-200">
+                        @CommenterName
+                      </span>
+                      ) in your reply so Facebook, Instagram & LinkedIn trigger an instant push notification on their phone!
                     </p>
                   </div>
                 </div>
@@ -1361,20 +1733,20 @@ export default function CreatePostPage() {
 
             <button
               type="submit"
-              disabled={loading || accounts.length === 0 || uploadingMedia}
-              className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-100 transition disabled:opacity-50"
+              disabled={loading || selectedAccountIds.length === 0 || uploadingMedia}
+              className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-md shadow-indigo-100 transition disabled:opacity-50 cursor-pointer"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Publishing...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Publishing to {selectedAccountIds.length} Channels...
                 </>
               ) : publishMode === 'now' ? (
                 <>
-                  <Send className="w-4 h-4" /> Publish Live Post & Automations
+                  <Send className="w-4 h-4" /> Publish Live Post ({selectedAccountIds.length} Channel{selectedAccountIds.length > 1 ? 's' : ''})
                 </>
               ) : (
                 <>
-                  <Calendar className="w-4 h-4" /> Add to Queue & Calendar
+                  <Calendar className="w-4 h-4" /> Schedule ({selectedAccountIds.length} Channel{selectedAccountIds.length > 1 ? 's' : ''}) to Calendar
                 </>
               )}
             </button>
@@ -1383,402 +1755,346 @@ export default function CreatePostPage() {
 
         {/* Right: Live Mockup Preview (5 cols) */}
         <div className="lg:col-span-5 sticky top-8 space-y-4">
-          {(() => {
-            const isLinkedIn = selectedAccount?.platform === 'LINKEDIN';
-            const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Live Feed Preview
+            </span>
 
-            return (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Live Mockup Preview
-                  </span>
-                  <span
-                    className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
-                      isLinkedIn
-                        ? 'bg-[#0A66C2] text-white'
-                        : isInstagram
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
-                        : 'bg-blue-50 text-blue-700'
+            {/* Platform indicator badge */}
+            <span
+              className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full ${
+                isPreviewLinkedIn
+                  ? 'bg-[#0A66C2] text-white'
+                  : isPreviewInstagram
+                  ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                  : 'bg-blue-600 text-white'
+              }`}
+            >
+              {isPreviewLinkedIn
+                ? 'LinkedIn Desktop Feed'
+                : isPreviewInstagram
+                ? 'Instagram Mobile Feed'
+                : 'Facebook Desktop'}
+            </span>
+          </div>
+
+          {/* If on Master tab: preview selector pills to quickly switch preview between selected channels */}
+          {isMaster && selectedAccountIds.length > 1 && (
+            <div className="flex items-center gap-1.5 p-1.5 bg-slate-100 rounded-xl overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-500 px-1">Preview:</span>
+              {selectedAccountIds.map((accId) => {
+                const acc = accounts.find((a) => a.id === accId);
+                if (!acc) return null;
+                const isCurrentPreview = previewAccount?.id === acc.id;
+
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => setPreviewAccountId(acc.id)}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      isCurrentPreview
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    {isLinkedIn
-                      ? 'LinkedIn Desktop Feed'
-                      : isInstagram
-                      ? 'Instagram Mobile Feed'
-                      : 'Facebook Desktop'}
-                  </span>
-                </div>
+                    <ChannelAvatar
+                      avatar={acc.avatar}
+                      name={acc.name}
+                      platform={acc.platform}
+                      size="xs"
+                    />
+                    <span className="truncate max-w-[80px]">{acc.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-                {isLinkedIn ? (
-                  /* LINKEDIN DESKTOP FEED MOCKUP */
-                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
-                    {/* LinkedIn Header */}
-                    <div className="p-4 flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="h-11 w-11 rounded-full bg-[#0A66C2] text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 overflow-hidden">
-                          {selectedAccount?.avatar ? (
-                            <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover" />
-                          ) : (
-                            <Linkedin className="w-5 h-5" />
-                          )}
+          {/* MOCKUP CONTAINER */}
+          {previewAccount && previewData && (
+            <>
+              {isPreviewLinkedIn ? (
+                /* LINKEDIN DESKTOP FEED MOCKUP */
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
+                  <div className="p-4 flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <ChannelAvatar
+                        avatar={previewAccount.avatar}
+                        name={previewAccount.name}
+                        platform="LINKEDIN"
+                        size="md"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-sm text-slate-900 truncate">
+                            {previewAccount.name || 'LinkedIn Member'}
+                          </span>
+                          <span className="text-slate-400 text-xs font-normal">• 1st</span>
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-bold text-sm text-slate-900 truncate">
-                              {selectedAccount?.name || 'LinkedIn Member'}
-                            </span>
-                            <span className="text-slate-400 text-xs font-normal">• 1st</span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 truncate leading-tight">
-                            Full Stack AI Engineer | PostCraft Architect · Creator
-                          </p>
-                          <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            Just now • Edited • <Globe className="w-3 h-3 text-slate-400 inline" />
-                          </p>
-                        </div>
-                      </div>
-
-                      <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* LinkedIn Commentary / Text */}
-                    <div className="px-4 pb-3">
-                      <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-                        {renderFormattedTextWithMentions(
-                          content || 'Your LinkedIn post commentary will appear here in real time...',
-                          'LINKEDIN'
-                        )}
-                      </div>
-                    </div>
-
-                    {/* LinkedIn Media Viewport */}
-                    {mediaUrl && (
-                      <div className="w-full bg-slate-950 max-h-84 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
-                        {mediaType === 'VIDEO' ? (
-                          <video src={mediaUrl} controls className="w-full max-h-84 object-cover" />
-                        ) : (
-                          <img src={mediaUrl} alt="LinkedIn Post Media" className="w-full object-cover max-h-84" />
-                        )}
-                      </div>
-                    )}
-
-                    {/* LinkedIn Engagement Counts Bar */}
-                    <div className="px-4 py-2 flex items-center justify-between text-[11px] text-slate-500 border-b border-slate-100">
-                      <div className="flex items-center gap-1">
-                        <span className="flex items-center -space-x-1">
-                          <span className="h-4 w-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] shadow-2xs">👍</span>
-                          <span className="h-4 w-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] shadow-2xs">💡</span>
-                          <span className="h-4 w-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] shadow-2xs">❤️</span>
-                        </span>
-                        <span className="hover:text-[#0A66C2] hover:underline cursor-pointer ml-1">54</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="hover:text-[#0A66C2] hover:underline cursor-pointer">18 comments</span>
-                        <span>•</span>
-                        <span className="hover:text-[#0A66C2] hover:underline cursor-pointer">5 reposts</span>
-                      </div>
-                    </div>
-
-                    {/* LinkedIn Actions */}
-                    <div className="px-2 py-1 flex items-center justify-around text-slate-600 text-xs font-semibold">
-                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
-                        <ThumbsUp className="w-4 h-4" /> Like
-                      </button>
-                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
-                        <MessageCircle className="w-4 h-4" /> Comment
-                      </button>
-                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
-                        <Share2 className="w-4 h-4" /> Repost
-                      </button>
-                      <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
-                        <Send className="w-4 h-4" /> Send
-                      </button>
-                    </div>
-
-                    {/* LinkedIn First Comment (if enabled) */}
-                    {enableFirstComment && firstCommentContent.trim() && (
-                      <div className="p-4 bg-slate-50/70 border-t border-slate-100 space-y-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0A66C2] flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
-                        </span>
-
-                        <div className="flex items-start gap-2.5">
-                          <div className="h-8 w-8 rounded-full bg-[#0A66C2] text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
-                            {selectedAccount?.name?.slice(0, 1).toUpperCase() || 'L'}
-                          </div>
-                          <div className="bg-slate-100 p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 flex-1 max-w-sm">
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs font-bold text-slate-900">
-                                {selectedAccount?.name || 'Member Name'}
-                              </p>
-                              <span className="text-[10px] text-slate-400">Author</span>
-                            </div>
-                            <p className="text-[10px] text-slate-500">Software Architect</p>
-                            <div className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">
-                              {renderFormattedTextWithMentions(firstCommentContent, 'LINKEDIN')}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Milestone Triggers Summary */}
-                    {enableMilestones && milestones.length > 0 && (
-                      <div className="p-3 bg-amber-50/50 border-t border-amber-100 text-[11px] space-y-1">
-                        <span className="font-bold text-amber-900 flex items-center gap-1">
-                          <ThumbsUp className="w-3 h-3 text-amber-600" /> Active LinkedIn Milestone Triggers:
-                        </span>
-                        {milestones.map((m) => (
-                          <p key={m.id} className="text-amber-800 text-[10px]">
-                            • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Auto-Reply Summary */}
-                    {enableAutoReply && autoReplyText.trim() && (
-                      <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
-                        <span className="font-bold text-violet-900 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-violet-600" /> Auto-Reply to LinkedIn Comments Active:
-                        </span>
-                        <p className="text-violet-800 text-[10px] mt-0.5">
-                          &quot;{autoReplyText.slice(0, 50)}...&quot;
+                        <p className="text-[11px] text-slate-500 truncate leading-tight">
+                          Full Stack AI Engineer | PostCraft Architect · Creator
+                        </p>
+                        <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          Just now • Edited • <Globe className="w-3 h-3 text-slate-400 inline" />
                         </p>
                       </div>
-                    )}
-                  </div>
-                ) : isInstagram ? (
-                  /* INSTAGRAM CARD MOCKUP */
-                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
-                    {/* IG Header */}
-                    <div className="p-3.5 flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-9 w-9 rounded-full p-[1.5px] bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex-shrink-0">
-                          <div className="h-full w-full rounded-full bg-white p-[1px] overflow-hidden flex items-center justify-center font-bold text-xs">
-                            {selectedAccount?.avatar ? (
-                              <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover rounded-full" />
-                            ) : (
-                              <Instagram className="w-4 h-4 text-pink-600" />
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="font-bold text-xs text-slate-900 leading-tight">
-                            {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
-                          </p>
-                          <p className="text-[10px] text-slate-400">Sponsored · Original audio</p>
-                        </div>
-                      </div>
-                      <button type="button" className="text-slate-400 hover:text-slate-600">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
                     </div>
 
-                    {/* IG Media Viewport */}
-                    <div className="w-full bg-slate-950 aspect-square max-h-96 overflow-hidden flex items-center justify-center relative">
-                      {mediaUrl ? (
-                        mediaType === 'VIDEO' ? (
-                          <video src={mediaUrl} controls className="w-full h-full object-cover" />
-                        ) : (
-                          <img src={mediaUrl} alt="Instagram Post" className="w-full h-full object-cover" />
-                        )
-                      ) : (
-                        <div className="text-center p-6 text-slate-400 space-y-2">
-                          <div className="w-12 h-12 rounded-2xl bg-slate-800 text-pink-400 flex items-center justify-center mx-auto">
-                            <Instagram className="w-6 h-6" />
-                          </div>
-                          <p className="text-xs font-medium text-slate-300">
-                            Attach an image or video to preview on Instagram
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            (Instagram requires media for all feed posts)
-                          </p>
-                        </div>
+                    <button type="button" className="text-slate-400 hover:text-slate-600 p-1">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="px-4 pb-3">
+                    <div className="text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                      {renderFormattedTextWithMentions(
+                        previewData.content || 'Your LinkedIn post commentary will appear here in real time...',
+                        'LINKEDIN'
                       )}
                     </div>
-
-                    {/* IG Actions */}
-                    <div className="px-3.5 pt-3 pb-1 flex items-center justify-between text-slate-800">
-                      <div className="flex items-center gap-4">
-                        <Heart className="w-5 h-5 hover:text-rose-500 cursor-pointer transition" />
-                        <MessageCircle className="w-5 h-5 hover:text-indigo-600 cursor-pointer transition" />
-                        <Send className="w-4 h-4 -rotate-45 hover:text-indigo-600 cursor-pointer transition" />
-                      </div>
-                      <Bookmark className="w-5 h-5 hover:text-slate-950 cursor-pointer transition" />
-                    </div>
-
-                    {/* Likes Count */}
-                    <div className="px-3.5 pt-1">
-                      <p className="text-xs font-bold text-slate-900">1,428 likes</p>
-                    </div>
-
-                    {/* IG Caption */}
-                    <div className="px-3.5 pt-1.5 pb-2 text-xs text-slate-800 leading-relaxed">
-                      <span className="font-bold mr-1.5 text-slate-900">
-                        {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
-                      </span>
-                      <span className="whitespace-pre-wrap">
-                        {renderFormattedTextWithMentions(content || 'Your post caption will appear here in real time...', 'INSTAGRAM')}
-                      </span>
-                    </div>
-
-                    {/* IG First Comment (if enabled) */}
-                    {enableFirstComment && firstCommentContent.trim() && (
-                      <div className="px-3.5 py-2.5 border-t border-slate-100 bg-pink-50/40 text-xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 flex items-center gap-1 mb-1">
-                          <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
-                        </span>
-                        <p className="text-slate-800 leading-snug">
-                          <span className="font-bold mr-1.5 text-slate-900">
-                            {selectedAccount?.name ? selectedAccount.name.replace(/^@/, '') : 'instagram_account'}
-                          </span>
-                          {renderFormattedTextWithMentions(firstCommentContent, 'INSTAGRAM')}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* View Comments count & Timestamp */}
-                    <div className="px-3.5 py-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
-                      <span>View all 24 comments</span>
-                      <span>JUST NOW</span>
-                    </div>
-
-                    {/* Planned Milestone Triggers Summary */}
-                    {enableMilestones && milestones.length > 0 && (
-                      <div className="p-3 bg-amber-50/60 border-t border-amber-100 text-[11px] space-y-1">
-                        <span className="font-bold text-amber-900 flex items-center gap-1">
-                          <Heart className="w-3 h-3" /> Active Milestone Triggers:
-                        </span>
-                        {milestones.map((m) => (
-                          <p key={m.id} className="text-amber-800 text-[10px]">
-                            • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Auto-Reply Summary */}
-                    {enableAutoReply && autoReplyText.trim() && (
-                      <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
-                        <span className="font-bold text-violet-900 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Auto-Reply to User Comments Active:
-                        </span>
-                        <p className="text-violet-800 text-[10px] mt-0.5">
-                          &quot;{autoReplyText.slice(0, 50)}...&quot;
-                        </p>
-                      </div>
-                    )}
                   </div>
-                ) : (
-                  /* Facebook Card Mockup */
-                  <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-                    {/* Header */}
-                    <div className="p-4 flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs flex-shrink-0 overflow-hidden">
-                        {selectedAccount?.avatar ? (
-                          <img src={selectedAccount.avatar} alt="Avatar" className="h-full w-full object-cover" />
-                        ) : (
-                          selectedAccount?.name?.slice(0, 2).toUpperCase() || 'FB'
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-slate-900 leading-snug truncate">
-                          {selectedAccount?.name || 'Your Facebook Page'}
-                        </p>
-                        <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                          Just now · <Globe className="w-3 h-3 text-slate-400 inline" />
-                        </p>
-                      </div>
+
+                  {previewData.mediaUrl && (
+                    <div className="w-full bg-slate-950 max-h-84 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
+                      {previewData.mediaType === 'VIDEO' ? (
+                        <video src={previewData.mediaUrl} controls className="w-full max-h-84 object-cover" />
+                      ) : (
+                        <img src={previewData.mediaUrl} alt="LinkedIn Post Media" className="w-full object-cover max-h-84" />
+                      )}
                     </div>
+                  )}
 
-                    {/* Post Text */}
-                    <div className="px-4 pb-3">
-                      <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-                        {renderFormattedTextWithMentions(content || 'Your post caption will appear here in real time...', 'FACEBOOK')}
-                      </p>
+                  <div className="px-4 py-2 flex items-center justify-between text-[11px] text-slate-500 border-b border-slate-100">
+                    <div className="flex items-center gap-1">
+                      <span className="flex items-center -space-x-1">
+                        <span className="h-4 w-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] shadow-2xs">👍</span>
+                        <span className="h-4 w-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] shadow-2xs">💡</span>
+                        <span className="h-4 w-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px] shadow-2xs">❤️</span>
+                      </span>
+                      <span className="hover:text-[#0A66C2] hover:underline cursor-pointer ml-1">54</span>
                     </div>
-
-                    {/* Media Preview (Video or Image) */}
-                    {mediaUrl && (
-                      <div className="w-full bg-slate-900 max-h-80 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
-                        {mediaType === 'VIDEO' ? (
-                          <video src={mediaUrl} controls className="w-full max-h-80 object-cover" />
-                        ) : (
-                          <img src={mediaUrl} alt="Attachment" className="w-full object-cover max-h-80" />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Reaction bar */}
-                    <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-around text-slate-500 text-xs font-semibold">
-                      <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
-                        <ThumbsUp className="w-4 h-4" /> Like
-                      </span>
-                      <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
-                        <MessageCircle className="w-4 h-4" /> Comment
-                      </span>
-                      <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
-                        <Share2 className="w-4 h-4" /> Share
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <span className="hover:text-[#0A66C2] hover:underline cursor-pointer">18 comments</span>
+                      <span>•</span>
+                      <span className="hover:text-[#0A66C2] hover:underline cursor-pointer">5 reposts</span>
                     </div>
+                  </div>
 
-                    {/* Auto First Comment Preview */}
-                    {enableFirstComment && firstCommentContent.trim() && (
-                      <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Auto First Comment ({firstCommentDelay === 0 ? 'Instant' : `+${firstCommentDelay}m`})
-                        </span>
+                  <div className="px-2 py-1 flex items-center justify-around text-slate-600 text-xs font-semibold">
+                    <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                      <ThumbsUp className="w-4 h-4" /> Like
+                    </button>
+                    <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                      <MessageCircle className="w-4 h-4" /> Comment
+                    </button>
+                    <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                      <Share2 className="w-4 h-4" /> Repost
+                    </button>
+                    <button type="button" className="flex-1 flex items-center justify-center gap-1.5 py-2 hover:bg-slate-100 rounded-lg transition">
+                      <Send className="w-4 h-4" /> Send
+                    </button>
+                  </div>
 
-                        <div className="flex items-start gap-2.5">
-                          <div className="h-7 w-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-                            {selectedAccount?.name?.slice(0, 1).toUpperCase() || 'P'}
+                  {previewData.enableFirstComment && previewData.firstCommentContent.trim() && (
+                    <div className="p-4 bg-slate-50/70 border-t border-slate-100 space-y-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0A66C2] flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Auto First Comment ({previewData.firstCommentDelay === 0 ? 'Instant' : `+${previewData.firstCommentDelay}m`})
+                      </span>
+
+                      <div className="flex items-start gap-2.5">
+                        <ChannelAvatar
+                          avatar={previewAccount.avatar}
+                          name={previewAccount.name}
+                          platform="LINKEDIN"
+                          size="sm"
+                          showBadge={false}
+                        />
+                        <div className="bg-slate-100 p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 flex-1 max-w-sm">
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-bold text-slate-900">
+                              {previewAccount.name || 'Member Name'}
+                            </p>
+                            <span className="text-[10px] text-slate-400">Author</span>
                           </div>
-                          <div className="bg-white p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 shadow-2xs max-w-sm">
-                            <p className="text-xs font-semibold text-slate-900">
-                              {selectedAccount?.name || 'Page Name'}
-                            </p>
-                            <p className="text-xs text-slate-700 whitespace-pre-wrap mt-0.5 leading-relaxed">
-                              {renderFormattedTextWithMentions(firstCommentContent, 'FACEBOOK')}
-                            </p>
+                          <p className="text-[10px] text-slate-500">Software Architect</p>
+                          <div className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">
+                            {renderFormattedTextWithMentions(previewData.firstCommentContent, 'LINKEDIN')}
                           </div>
                         </div>
                       </div>
-                    )}
-
-                    {/* Planned Milestone Triggers Summary */}
-                    {enableMilestones && milestones.length > 0 && (
-                      <div className="p-3 bg-amber-50/50 border-t border-amber-100 text-[11px] space-y-1">
-                        <span className="font-bold text-amber-900 flex items-center gap-1">
-                          <ThumbsUp className="w-3 h-3" /> Active Milestone Triggers:
-                        </span>
-                        {milestones.map((m) => (
-                          <p key={m.id} className="text-amber-800 text-[10px]">
-                            • At {m.threshold} {m.type.toLowerCase()}: &quot;{m.commentText.slice(0, 45)}...&quot;
-                          </p>
-                        ))}
+                    </div>
+                  )}
+                </div>
+              ) : isPreviewInstagram ? (
+                /* INSTAGRAM CARD MOCKUP */
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900">
+                  <div className="p-3.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <ChannelAvatar
+                        avatar={previewAccount.avatar}
+                        name={previewAccount.name}
+                        platform="INSTAGRAM"
+                        size="sm"
+                      />
+                      <div>
+                        <p className="font-bold text-xs text-slate-900 leading-tight">
+                          {previewAccount.name ? previewAccount.name.replace(/^@/, '') : 'instagram_account'}
+                        </p>
+                        <p className="text-[10px] text-slate-400">Sponsored · Original audio</p>
                       </div>
-                    )}
+                    </div>
+                    <button type="button" className="text-slate-400 hover:text-slate-600">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                    {/* Auto-Reply Summary */}
-                    {enableAutoReply && autoReplyText.trim() && (
-                      <div className="p-3 bg-violet-50/50 border-t border-violet-100 text-[11px]">
-                        <span className="font-bold text-violet-900 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Auto-Reply to User Comments Active:
-                        </span>
-                        <p className="text-violet-800 text-[10px] mt-0.5">
-                          &quot;{autoReplyText.slice(0, 50)}...&quot;
+                  <div className="w-full bg-slate-950 aspect-square max-h-96 overflow-hidden flex items-center justify-center relative">
+                    {previewData.mediaUrl ? (
+                      previewData.mediaType === 'VIDEO' ? (
+                        <video src={previewData.mediaUrl} controls className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={previewData.mediaUrl} alt="Instagram Post" className="w-full h-full object-cover" />
+                      )
+                    ) : (
+                      <div className="text-center p-6 text-slate-400 space-y-2">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-800 text-pink-400 flex items-center justify-center mx-auto">
+                          <Instagram className="w-6 h-6" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-300">
+                          Attach an image or video to preview on Instagram
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          (Instagram requires media for all feed posts)
                         </p>
                       </div>
                     )}
                   </div>
-                )}
-              </>
-            );
-          })()}
+
+                  <div className="px-3.5 pt-3 pb-1 flex items-center justify-between text-slate-800">
+                    <div className="flex items-center gap-4">
+                      <Heart className="w-5 h-5 hover:text-rose-500 cursor-pointer transition" />
+                      <MessageCircle className="w-5 h-5 hover:text-indigo-600 cursor-pointer transition" />
+                      <Send className="w-4 h-4 -rotate-45 hover:text-indigo-600 cursor-pointer transition" />
+                    </div>
+                    <Bookmark className="w-5 h-5 hover:text-slate-950 cursor-pointer transition" />
+                  </div>
+
+                  <div className="px-3.5 pt-1">
+                    <p className="text-xs font-bold text-slate-900">1,428 likes</p>
+                  </div>
+
+                  <div className="px-3.5 pt-1.5 pb-2 text-xs text-slate-800 leading-relaxed">
+                    <span className="font-bold mr-1.5 text-slate-900">
+                      {previewAccount.name ? previewAccount.name.replace(/^@/, '') : 'instagram_account'}
+                    </span>
+                    <span className="whitespace-pre-wrap">
+                      {renderFormattedTextWithMentions(
+                        previewData.content || 'Your post caption will appear here in real time...',
+                        'INSTAGRAM'
+                      )}
+                    </span>
+                  </div>
+
+                  {previewData.enableFirstComment && previewData.firstCommentContent.trim() && (
+                    <div className="px-3.5 py-2.5 border-t border-slate-100 bg-pink-50/40 text-xs">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 flex items-center gap-1 mb-1">
+                        <Sparkles className="w-3 h-3" /> Auto First Comment ({previewData.firstCommentDelay === 0 ? 'Instant' : `+${previewData.firstCommentDelay}m`})
+                      </span>
+                      <p className="text-slate-800 leading-snug">
+                        <span className="font-bold mr-1.5 text-slate-900">
+                          {previewAccount.name ? previewAccount.name.replace(/^@/, '') : 'instagram_account'}
+                        </span>
+                        {renderFormattedTextWithMentions(previewData.firstCommentContent, 'INSTAGRAM')}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="px-3.5 py-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+                    <span>View all 24 comments</span>
+                    <span>JUST NOW</span>
+                  </div>
+                </div>
+              ) : (
+                /* FACEBOOK DESKTOP CARD MOCKUP */
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+                  <div className="p-4 flex items-center gap-3">
+                    <ChannelAvatar
+                      avatar={previewAccount.avatar}
+                      name={previewAccount.name}
+                      platform="FACEBOOK"
+                      size="md"
+                    />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-slate-900 leading-snug truncate">
+                        {previewAccount.name || 'Your Facebook Page'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                        Just now · <Globe className="w-3 h-3 text-slate-400 inline" />
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="px-4 pb-3">
+                    <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+                      {renderFormattedTextWithMentions(
+                        previewData.content || 'Your post caption will appear here in real time...',
+                        'FACEBOOK'
+                      )}
+                    </p>
+                  </div>
+
+                  {previewData.mediaUrl && (
+                    <div className="w-full bg-slate-900 max-h-80 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
+                      {previewData.mediaType === 'VIDEO' ? (
+                        <video src={previewData.mediaUrl} controls className="w-full max-h-80 object-cover" />
+                      ) : (
+                        <img src={previewData.mediaUrl} alt="Attachment" className="w-full object-cover max-h-80" />
+                      )}
+                    </div>
+                  )}
+
+                  <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-around text-slate-500 text-xs font-semibold">
+                    <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
+                      <ThumbsUp className="w-4 h-4" /> Like
+                    </span>
+                    <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
+                      <MessageCircle className="w-4 h-4" /> Comment
+                    </span>
+                    <span className="flex items-center gap-1.5 hover:text-blue-600 cursor-pointer py-1">
+                      <Share2 className="w-4 h-4" /> Share
+                    </span>
+                  </div>
+
+                  {previewData.enableFirstComment && previewData.firstCommentContent.trim() && (
+                    <div className="p-4 bg-slate-50 border-t border-slate-100 space-y-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-indigo-600 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> Auto First Comment ({previewData.firstCommentDelay === 0 ? 'Instant' : `+${previewData.firstCommentDelay}m`})
+                      </span>
+
+                      <div className="flex items-start gap-2.5">
+                        <ChannelAvatar
+                          avatar={previewAccount.avatar}
+                          name={previewAccount.name}
+                          platform="FACEBOOK"
+                          size="sm"
+                          showBadge={false}
+                        />
+                        <div className="bg-white p-3 rounded-2xl rounded-tl-xs border border-slate-200/80 shadow-2xs max-w-sm">
+                          <p className="text-xs font-semibold text-slate-900">
+                            {previewAccount.name || 'Page Name'}
+                          </p>
+                          <p className="text-xs text-slate-700 whitespace-pre-wrap mt-0.5 leading-relaxed">
+                            {renderFormattedTextWithMentions(previewData.firstCommentContent, 'FACEBOOK')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -1846,7 +2162,7 @@ export default function CreatePostPage() {
                     type="button"
                     className="flex-1 py-1.5 rounded-full border border-[#0A66C2] text-[#0A66C2] hover:bg-blue-50 font-semibold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
                   >
-                    <Send className="w-3 h-3" /> Message
+                    <Send className="w-3.5 h-3.5" /> Message
                   </button>
                 </div>
               </div>
@@ -1881,7 +2197,6 @@ export default function CreatePostPage() {
                 </p>
               )}
 
-              {/* Stats */}
               <div className="flex items-center justify-around pt-2 border-t border-slate-100 text-center text-xs">
                 <div>
                   <p className="font-bold text-slate-900">{hoveredProfileData.profile.postsCount || '142'}</p>
