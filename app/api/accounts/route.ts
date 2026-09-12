@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
-import { verifyFacebookPage } from '@/lib/facebook';
+import { verifyFacebookPage, verifyFacebookAccount } from '@/lib/facebook';
 import { verifyInstagramAccount } from '@/lib/instagram';
 import { verifyLinkedInAccount } from '@/lib/linkedin';
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { platform = 'FACEBOOK', pageId, accessToken } = await req.json();
+    const { platform = 'FACEBOOK', pageId, accessToken, accountType = 'PAGE' } = await req.json();
 
     if (!pageId || !accessToken) {
       return NextResponse.json(
@@ -69,11 +69,12 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+      const isProfile = accountType === 'PROFILE' || !verification.data.isOrganization;
       accountData = {
         id: verification.data.id,
         name: verification.data.name,
         avatar: verification.data.avatar,
-        category: verification.data.isOrganization ? 'LinkedIn Company Page' : 'LinkedIn Member Profile',
+        category: isProfile ? 'LinkedIn Personal Profile' : 'LinkedIn Company Page',
         token: verification.data.accessToken,
       };
     } else if (platform === 'INSTAGRAM') {
@@ -84,19 +85,24 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+      const isProfile = accountType === 'PROFILE';
       accountData = {
         id: verification.data.id,
         name: `@${verification.data.username.replace(/^@/, '')}`,
         avatar: verification.data.avatar,
-        category: 'Instagram Business',
+        category: isProfile ? 'Instagram Creator Profile' : 'Instagram Business',
         token: verification.data.accessToken,
       };
     } else {
-      // Default: Facebook
-      const verification = await verifyFacebookPage(pageId.trim(), accessToken.trim());
+      // Facebook: Page or Personal Profile
+      const verification = await verifyFacebookAccount(
+        pageId.trim(),
+        accessToken.trim(),
+        accountType as 'PAGE' | 'PROFILE'
+      );
       if (!verification.success || !verification.data) {
         return NextResponse.json(
-          { error: verification.error || 'Invalid Facebook Page credentials' },
+          { error: verification.error || 'Invalid Facebook credentials' },
           { status: 400 }
         );
       }
@@ -104,8 +110,8 @@ export async function POST(req: NextRequest) {
         id: verification.data.id,
         name: verification.data.name,
         avatar: verification.data.avatar,
-        category: verification.data.category,
-        token: verification.data.pageAccessToken,
+        category: verification.data.category || (accountType === 'PROFILE' ? 'Facebook Personal Profile' : 'Facebook Page'),
+        token: verification.data.accessToken,
       };
     }
 
@@ -137,6 +143,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const typeLabel = accountData.category?.includes('Profile') ? 'Personal Profile' : 'Page';
     return NextResponse.json({
       success: true,
       account: {
@@ -147,7 +154,7 @@ export async function POST(req: NextRequest) {
         avatar: account.avatar,
         category: account.category,
       },
-      message: `Successfully connected ${platform === 'INSTAGRAM' ? 'Instagram Account' : 'Facebook Page'}: ${account.name}`,
+      message: `Successfully connected ${platform} ${typeLabel}: ${account.name}`,
     });
   } catch (error: any) {
     console.error('Error connecting account:', error);

@@ -31,28 +31,51 @@ export interface PublishCommentParams {
 const GRAPH_API_VERSION = 'v20.0';
 const GRAPH_BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
+export interface FacebookAccountInfo {
+  id: string;
+  name: string;
+  category?: string;
+  avatar?: string | null;
+  accessToken: string;
+  isProfile?: boolean;
+}
+
 /**
- * Verify Facebook Page Token and fetch details (auto-extracts Page Access Token if User Token is provided)
+ * Verify Facebook Account (Page or Personal Profile)
  */
-export async function verifyFacebookPage(
-  pageId: string,
-  accessToken: string
-): Promise<{ success: boolean; data?: FacebookPageInfo; error?: string }> {
-  if (accessToken.startsWith('TEST_') || pageId.startsWith('TEST_')) {
+export async function verifyFacebookAccount(
+  targetId: string,
+  accessToken: string,
+  accountType: 'PAGE' | 'PROFILE' = 'PAGE'
+): Promise<{ success: boolean; data?: FacebookAccountInfo; error?: string }> {
+  const isProfile =
+    accountType === 'PROFILE' ||
+    targetId.toLowerCase() === 'me' ||
+    targetId.includes('USER') ||
+    targetId.includes('PROFILE');
+
+  if (accessToken.startsWith('TEST_') || targetId.startsWith('TEST_')) {
     return {
       success: true,
       data: {
-        id: pageId || '1092837465',
-        name: 'Demo Facebook Page (Simulated)',
-        category: 'Product/Service',
-        avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
-        pageAccessToken: accessToken,
+        id: targetId || (isProfile ? 'TEST_FB_USER_101' : '1092837465'),
+        name: isProfile ? 'Alamin Hossain (Facebook Profile)' : 'Demo Facebook Page (Simulated)',
+        category: isProfile ? 'Personal Profile' : 'Product/Service',
+        avatar: isProfile
+          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'
+          : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+        accessToken: accessToken,
+        isProfile,
       },
     };
   }
 
   try {
-    const url = `${GRAPH_BASE_URL}/${pageId}?fields=id,name,category,picture{url},access_token&access_token=${encodeURIComponent(
+    const fields = isProfile
+      ? 'id,name,picture{url}'
+      : 'id,name,category,picture{url},access_token';
+    const cleanId = isProfile && (!targetId || targetId === 'me') ? 'me' : targetId;
+    const url = `${GRAPH_BASE_URL}/${cleanId}?fields=${fields}&access_token=${encodeURIComponent(
       accessToken
     )}`;
     const res = await fetch(url);
@@ -61,7 +84,9 @@ export async function verifyFacebookPage(
     if (!res.ok || data.error) {
       return {
         success: false,
-        error: data.error?.message || 'Failed to verify Facebook Page credentials.',
+        error:
+          data.error?.message ||
+          `Failed to verify Facebook ${isProfile ? 'Personal Profile' : 'Page'} credentials.`,
       };
     }
 
@@ -70,9 +95,10 @@ export async function verifyFacebookPage(
       data: {
         id: data.id,
         name: data.name,
-        category: data.category,
+        category: isProfile ? 'Personal Profile' : (data.category || 'Facebook Page'),
         avatar: data.picture?.data?.url || null,
-        pageAccessToken: data.access_token || accessToken,
+        accessToken: data.access_token || accessToken,
+        isProfile,
       },
     };
   } catch (error: any) {
@@ -81,6 +107,29 @@ export async function verifyFacebookPage(
       error: error?.message || 'Network error connecting to Facebook Graph API',
     };
   }
+}
+
+/**
+ * Verify Facebook Page Token and fetch details (backwards compatible)
+ */
+export async function verifyFacebookPage(
+  pageId: string,
+  accessToken: string
+): Promise<{ success: boolean; data?: FacebookPageInfo; error?: string }> {
+  const result = await verifyFacebookAccount(pageId, accessToken, 'PAGE');
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error };
+  }
+  return {
+    success: true,
+    data: {
+      id: result.data.id,
+      name: result.data.name,
+      category: result.data.category,
+      avatar: result.data.avatar || undefined,
+      pageAccessToken: result.data.accessToken,
+    },
+  };
 }
 
 /**

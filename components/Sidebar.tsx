@@ -24,6 +24,7 @@ interface SidebarAccount {
   platform: string;
   avatar?: string;
   accountId: string;
+  category?: string;
 }
 
 export default function Sidebar({ user }: { user?: { name?: string | null; email: string } | null }) {
@@ -185,8 +186,12 @@ export default function Sidebar({ user }: { user?: { name?: string | null; email
                       <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-indigo-600 transition">
                         {chan.name}
                       </p>
-                      <p className="text-[10px] text-slate-400 truncate">
-                        {chan.platform}
+                      <p className="text-[10px] text-slate-400 truncate flex items-center gap-1">
+                        <span>{chan.platform}</span>
+                        <span>•</span>
+                        <span className="font-medium text-slate-500">
+                          {chan.category?.toLowerCase().includes('profile') ? '👤 Profile' : '🏢 Page'}
+                        </span>
                       </p>
                     </div>
                   </div>

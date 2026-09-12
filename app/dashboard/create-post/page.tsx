@@ -46,6 +46,7 @@ interface Account {
   avatar?: string | null;
   accountId: string;
   platform: string;
+  category?: string;
 }
 
 interface MilestoneInput {
@@ -1210,8 +1211,8 @@ export default function CreatePostPage() {
                     <p className={`text-xs font-bold truncate max-w-[130px] ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
                       {acc.name}
                     </p>
-                    <p className="text-[10px] text-slate-400 capitalize">
-                      {acc.platform.toLowerCase()}
+                    <p className="text-[10px] text-slate-400 capitalize truncate">
+                      {acc.category?.toLowerCase().includes('profile') ? '👤 Profile' : '🏢 Page'} • {acc.platform.toLowerCase()}
                     </p>
                   </div>
                 </button>
