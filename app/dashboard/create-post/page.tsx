@@ -28,7 +28,9 @@ import {
   AtSign,
   Users,
   UserCheck,
-  Bell
+  Bell,
+  BadgeCheck,
+  UserPlus
 } from 'lucide-react';
 
 interface Account {
@@ -111,12 +113,181 @@ export default function CreatePostPage() {
     cursorIndex: 0,
   });
 
+  interface MentionProfile {
+    id: string;
+    tag: string;
+    name: string;
+    subtitle: string;
+    avatar?: string;
+    verified?: boolean;
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'ALL';
+    type: 'profile' | 'page' | 'audience' | 'custom';
+    followers?: string;
+    bio?: string;
+    postsCount?: string;
+    followingCount?: string;
+  }
+
+  const DEFAULT_PROFILES: MentionProfile[] = [
+    // Facebook Profiles & Pages
+    {
+      id: 'fb_1',
+      tag: '@MarkZuckerberg',
+      name: 'Mark Zuckerberg',
+      subtitle: 'Founder & CEO at Meta · 119M followers',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      verified: true,
+      platform: 'FACEBOOK',
+      type: 'profile',
+      followers: '119M followers',
+      bio: 'Founder and CEO at Meta. Building technology that brings people together.',
+    },
+    {
+      id: 'fb_2',
+      tag: '@TanvirAhmed',
+      name: 'Tanvir Ahmed',
+      subtitle: 'Friend · 14 mutual friends',
+      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150',
+      verified: false,
+      platform: 'FACEBOOK',
+      type: 'profile',
+      followers: '3.4K followers',
+      bio: 'Software engineer & digital creator based in Dhaka, Bangladesh.',
+    },
+    {
+      id: 'fb_3',
+      tag: '@NusratJahan',
+      name: 'Nusrat Jahan',
+      subtitle: 'Digital Creator · Followed by 24K',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+      verified: true,
+      platform: 'FACEBOOK',
+      type: 'profile',
+      followers: '24K followers',
+      bio: 'Lifestyle & design creator sharing tips for creators ✨',
+    },
+    {
+      id: 'fb_4',
+      tag: '@TechNewsDaily',
+      name: 'Tech News Daily',
+      subtitle: 'Media / News Page · 480K followers',
+      avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+      verified: true,
+      platform: 'FACEBOOK',
+      type: 'page',
+      followers: '480K followers',
+      bio: 'Breaking tech news, product reviews, and gadget launches ⚡',
+    },
+
+    // Instagram Profiles & Creators
+    {
+      id: 'ig_1',
+      tag: '@cristiano',
+      name: 'Cristiano Ronaldo',
+      subtitle: 'Athlete · 630M followers',
+      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+      verified: true,
+      platform: 'INSTAGRAM',
+      type: 'profile',
+      followers: '630M followers',
+      postsCount: '3,712',
+      followingCount: '580',
+      bio: 'SIUUU! Join my journey. Football, family, and hard work ⚽',
+    },
+    {
+      id: 'ig_2',
+      tag: '@postcraft.official',
+      name: 'PostCraft App',
+      subtitle: 'Software & Technology · Verified',
+      avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150',
+      verified: true,
+      platform: 'INSTAGRAM',
+      type: 'page',
+      followers: '52.4K followers',
+      postsCount: '248',
+      followingCount: '92',
+      bio: 'AI-Powered Social Media Management Suite for Growth 🚀',
+    },
+    {
+      id: 'ig_3',
+      tag: '@sarah_designs',
+      name: 'Sarah Jenkins',
+      subtitle: 'Visual Artist · 98K followers',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      verified: true,
+      platform: 'INSTAGRAM',
+      type: 'profile',
+      followers: '98K followers',
+      postsCount: '419',
+      followingCount: '310',
+      bio: 'Crafting minimalist aesthetics & digital brand identities ✨',
+    },
+    {
+      id: 'ig_4',
+      tag: '@tech_insider',
+      name: 'Tech Insider',
+      subtitle: 'Science & Technology · 1.2M followers',
+      avatar: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=150',
+      verified: true,
+      platform: 'INSTAGRAM',
+      type: 'page',
+      followers: '1.2M followers',
+      postsCount: '1,890',
+      followingCount: '42',
+      bio: 'Exploring future tech, robotics, AI, and futuristic gadgets 🤖',
+    },
+
+    // Broadcast Audience Tags
+    {
+      id: 'aud_1',
+      tag: '@everyone',
+      name: '@everyone',
+      subtitle: 'Notify all group members or page followers',
+      platform: 'ALL',
+      type: 'audience',
+      bio: 'Sends a priority notification badge to all active members',
+    },
+    {
+      id: 'aud_2',
+      tag: '@followers',
+      name: '@followers',
+      subtitle: 'Send direct notification to all active followers',
+      platform: 'ALL',
+      type: 'audience',
+      bio: 'Reaches your follower base directly in their feed',
+    },
+    {
+      id: 'aud_3',
+      tag: '@topfans',
+      name: '@topfans',
+      subtitle: 'Acknowledge and reward Top Fan badge holders',
+      platform: 'ALL',
+      type: 'audience',
+      bio: 'Mentions and rewards the highest engaging community fans',
+    },
+    {
+      id: 'aud_4',
+      tag: '@highlights',
+      name: '@highlights',
+      subtitle: 'Highlight post in friends & followers notification feed',
+      platform: 'ALL',
+      type: 'audience',
+      bio: 'Highlights update in newsfeed recommendation queue',
+    },
+  ];
+
   const AUDIENCE_TAGS = [
     { tag: '@everyone', name: 'Everyone', desc: 'Notify everyone in group or followers', type: 'audience' },
     { tag: '@followers', name: 'Followers', desc: 'Notify all active followers of the page', type: 'audience' },
     { tag: '@topfans', name: 'Top Fans', desc: 'Mention and notify your top fans', type: 'audience' },
     { tag: '@highlights', name: 'Highlights', desc: 'Highlight update in followers feed', type: 'audience' },
   ];
+
+  const [hoveredProfileData, setHoveredProfileData] = useState<{
+    profile: MentionProfile;
+    platform: 'FACEBOOK' | 'INSTAGRAM';
+    rect: { top: number; left: number };
+  } | null>(null);
 
   const handleInputChangeWithMention = (
     field: 'content' | 'firstComment' | 'autoReply',
@@ -200,40 +371,80 @@ export default function CreatePostPage() {
     }
   };
 
-  const getFilteredSuggestions = () => {
+  const getFilteredSuggestions = (): MentionProfile[] => {
+    const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
     const q = mentionState.query.toLowerCase();
-    const accountSuggestions = accounts.map((acc) => {
+
+    // 1. Dynamic accounts connected by user
+    const userConnectedAccounts: MentionProfile[] = accounts.map((acc) => {
       const cleanHandle = acc.name.replace(/^@/, '').replace(/\s+/g, '');
       return {
+        id: `acc_${acc.id}`,
         tag: `@${cleanHandle}`,
         name: acc.name,
-        desc: `${acc.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} Account`,
-        avatar: acc.avatar,
-        type: 'account' as const,
+        subtitle: `Your Connected ${acc.platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'} Account`,
+        avatar: acc.avatar || undefined,
+        verified: true,
+        platform: (acc.platform === 'INSTAGRAM' ? 'INSTAGRAM' : 'FACEBOOK') as any,
+        type: 'page',
+        followers: 'Active Page',
+        bio: `Connected account on PostCraft`,
       };
     });
 
-    const list: Array<{ tag: string; name: string; desc: string; avatar?: string; type: string }> = [
-      ...accountSuggestions,
-      ...AUDIENCE_TAGS,
-    ];
+    // 2. Filter default profiles matching current platform
+    const platformProfiles = DEFAULT_PROFILES.filter(
+      (p) => p.platform === 'ALL' || (isInstagram ? p.platform === 'INSTAGRAM' : p.platform === 'FACEBOOK')
+    );
 
-    if (q && !list.some((item) => item.tag.toLowerCase() === `@${q}`)) {
-      list.push({
-        tag: `@${q}`,
-        name: `@${q}`,
-        desc: 'Custom mention handle',
-        avatar: undefined,
-        type: 'custom',
-      });
+    const allProfiles = [...userConnectedAccounts, ...platformProfiles];
+
+    // 3. If query typed, filter; if no exact match, add custom tag
+    let list = allProfiles;
+    if (q) {
+      list = allProfiles.filter(
+        (p) =>
+          p.tag.toLowerCase().includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          p.subtitle.toLowerCase().includes(q)
+      );
+
+      if (!list.some((p) => p.tag.toLowerCase() === `@${q}`)) {
+        list.push({
+          id: 'custom_search',
+          tag: `@${q}`,
+          name: q,
+          subtitle: `Tag @${q} on ${isInstagram ? 'Instagram' : 'Facebook'}`,
+          platform: isInstagram ? 'INSTAGRAM' : 'FACEBOOK',
+          type: 'custom',
+        });
+      }
     }
 
-    return list.filter(
-      (item) =>
-        item.tag.toLowerCase().includes(q) ||
-        item.name.toLowerCase().includes(q) ||
-        item.desc.toLowerCase().includes(q)
-    );
+    return list;
+  };
+
+  const findProfileByTag = (tag: string, platform: 'FACEBOOK' | 'INSTAGRAM'): MentionProfile => {
+    const cleanTag = tag.trim().toLowerCase();
+    const suggestions = getFilteredSuggestions();
+    const found = suggestions.find((s) => s.tag.toLowerCase() === cleanTag);
+    if (found) return found;
+
+    const rawName = tag.replace(/^@/, '');
+    return {
+      id: `dynamic_${rawName}`,
+      tag: tag.startsWith('@') ? tag : `@${tag}`,
+      name: rawName,
+      subtitle: platform === 'INSTAGRAM' ? 'Instagram User · Followed by friends' : 'Facebook Profile · Active Now',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      verified: false,
+      platform,
+      type: 'profile',
+      followers: '1.5K followers',
+      bio: `${tag} active on ${platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}`,
+      postsCount: '84',
+      followingCount: '210',
+    };
   };
 
   const renderFormattedTextWithMentions = (
@@ -257,10 +468,19 @@ export default function CreatePostPage() {
         return (
           <span
             key={index}
-            className={`font-semibold cursor-pointer hover:underline ${
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setHoveredProfileData({
+                profile: findProfileByTag(part, platform),
+                platform,
+                rect: { top: rect.top, left: rect.left },
+              });
+            }}
+            onMouseLeave={() => setHoveredProfileData(null)}
+            className={`font-semibold cursor-pointer transition inline-block ${
               platform === 'INSTAGRAM'
-                ? 'text-sky-600 bg-sky-50/70 px-1 py-0.5 rounded'
-                : 'text-blue-600 bg-blue-50/70 px-1 py-0.5 rounded'
+                ? 'text-sky-600 hover:text-sky-700 bg-sky-50/70 hover:bg-sky-100 px-1 py-0.2 rounded'
+                : 'text-blue-600 hover:text-blue-700 bg-blue-50/70 hover:bg-blue-100 px-1 py-0.2 rounded'
             }`}
           >
             {part}
@@ -273,62 +493,137 @@ export default function CreatePostPage() {
 
   const renderMentionDropdown = (field: 'content' | 'firstComment' | 'autoReply') => {
     if (!mentionState.isOpen || mentionState.targetField !== field) return null;
+    const isInstagram = selectedAccount?.platform === 'INSTAGRAM';
     const suggestions = getFilteredSuggestions();
 
     return (
-      <div className="absolute left-0 right-0 z-30 mt-1 bg-white rounded-2xl shadow-xl border border-indigo-200 p-2 space-y-1">
-        <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-slate-400 border-b border-slate-100">
-          <span className="flex items-center gap-1.5 text-indigo-600 font-bold">
-            <AtSign className="w-3.5 h-3.5" /> Mention / Tag suggestions
-          </span>
+      <div className="absolute left-0 right-0 z-30 mt-1 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        {/* Header customized for Facebook or Instagram */}
+        <div
+          className={`p-3 border-b flex items-center justify-between ${
+            isInstagram
+              ? 'bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-purple-600/10 border-pink-100'
+              : 'bg-blue-50/70 border-blue-100'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {isInstagram ? (
+              <span className="p-1.5 rounded-lg bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 text-white flex items-center justify-center shadow-xs">
+                <Instagram className="w-3.5 h-3.5" />
+              </span>
+            ) : (
+              <span className="p-1.5 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                <Globe className="w-3.5 h-3.5" />
+              </span>
+            )}
+            <div>
+              <p className="text-xs font-bold text-slate-900 leading-tight">
+                {isInstagram ? 'Instagram Profiles & Creators' : 'Facebook Profiles & Pages'}
+              </p>
+              <p className="text-[10px] text-slate-500">
+                {isInstagram ? 'Tagging sends direct notification to users' : 'Mentioning tags profiles and notifies them'}
+              </p>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => setMentionState((prev) => ({ ...prev, isOpen: false }))}
-            className="text-slate-400 hover:text-slate-600"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="max-h-52 overflow-y-auto space-y-0.5">
+
+        {/* Profile List */}
+        <div className="max-h-64 overflow-y-auto p-1.5 space-y-1">
           {suggestions.length === 0 ? (
-            <p className="p-3 text-xs text-slate-400 text-center">No matching accounts or tags found</p>
+            <div className="p-4 text-center text-xs text-slate-400">
+              No matching profiles or pages found
+            </div>
           ) : (
-            suggestions.map((item, i) => (
+            suggestions.map((item) => (
               <button
-                key={i}
+                key={item.id}
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   insertMention(item.tag);
                 }}
-                className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-indigo-50 text-left transition group cursor-pointer"
+                className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition group cursor-pointer ${
+                  isInstagram
+                    ? 'hover:bg-gradient-to-r hover:from-pink-50 hover:to-purple-50'
+                    : 'hover:bg-[#F0F2F5]'
+                }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Avatar rendering */}
                   {item.avatar ? (
-                    <img src={item.avatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
-                  ) : item.type === 'account' ? (
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-pink-500 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
-                      @
+                    <div
+                      className={`relative flex-shrink-0 ${
+                        isInstagram
+                          ? 'p-[1.5px] rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600'
+                          : ''
+                      }`}
+                    >
+                      <img
+                        src={item.avatar}
+                        alt={item.name}
+                        className={`w-9 h-9 rounded-full object-cover ${
+                          isInstagram ? 'border border-white' : 'border border-slate-200'
+                        }`}
+                      />
+                      {item.verified && !isInstagram && (
+                        <div className="absolute -bottom-0.5 -right-0.5 bg-blue-600 text-white rounded-full p-0.5 shadow-xs">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
+                        </div>
+                      )}
                     </div>
                   ) : item.type === 'audience' ? (
-                    <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
                       👥
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
                       @
                     </div>
                   )}
+
+                  {/* Profile Details */}
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 group-hover:text-indigo-600 truncate">
-                      {item.tag}
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
+                        {isInstagram ? item.tag : item.name}
+                      </p>
+                      {item.verified && (
+                        <BadgeCheck
+                          className={`w-3.5 h-3.5 flex-shrink-0 ${
+                            isInstagram ? 'text-sky-500 fill-sky-500 text-white' : 'text-blue-600 fill-blue-600 text-white'
+                          }`}
+                        />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {isInstagram ? item.name : item.subtitle}
                     </p>
-                    <p className="text-[10px] text-slate-400 truncate">{item.desc}</p>
                   </div>
                 </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 group-hover:bg-indigo-600 group-hover:text-white text-slate-600 flex-shrink-0 transition">
-                  Insert
-                </span>
+
+                {/* Right side Tag & Insert badge */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-700">
+                    {item.tag}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-1 rounded-lg transition ${
+                      isInstagram
+                        ? 'bg-pink-100 text-pink-700 group-hover:bg-gradient-to-r group-hover:from-pink-500 group-hover:to-purple-600 group-hover:text-white'
+                        : 'bg-blue-100 text-blue-700 group-hover:bg-blue-600 group-hover:text-white'
+                    }`}
+                  >
+                    Tag
+                  </span>
+                </div>
               </button>
             ))
           )}
@@ -1227,6 +1522,127 @@ export default function CreatePostPage() {
           })()}
         </div>
       </div>
+
+      {/* Interactive Profile Hover Card for Mentions */}
+      {hoveredProfileData && (
+        <div
+          className="fixed z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95"
+          style={{
+            top: Math.max(12, hoveredProfileData.rect.top - 210),
+            left: Math.max(12, hoveredProfileData.rect.left - 60),
+          }}
+        >
+          {hoveredProfileData.platform === 'INSTAGRAM' ? (
+            /* Instagram Profile Card */
+            <div className="w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 space-y-3 pointer-events-auto">
+              <div className="flex items-center gap-3">
+                <div className="p-[2px] rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex-shrink-0">
+                  <img
+                    src={hoveredProfileData.profile.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                    alt="Avatar"
+                    className="w-12 h-12 rounded-full object-cover border border-white"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1">
+                    <p className="font-bold text-xs text-slate-900 truncate">
+                      {hoveredProfileData.profile.tag.replace(/^@/, '')}
+                    </p>
+                    {hoveredProfileData.profile.verified && (
+                      <BadgeCheck className="w-3.5 h-3.5 text-sky-500 fill-sky-500 text-white flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">{hoveredProfileData.profile.name}</p>
+                </div>
+              </div>
+
+              {hoveredProfileData.profile.bio && (
+                <p className="text-xs text-slate-700 leading-snug">
+                  {hoveredProfileData.profile.bio}
+                </p>
+              )}
+
+              {/* Stats */}
+              <div className="flex items-center justify-around pt-2 border-t border-slate-100 text-center text-xs">
+                <div>
+                  <p className="font-bold text-slate-900">{hoveredProfileData.profile.postsCount || '142'}</p>
+                  <p className="text-[10px] text-slate-400">posts</p>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">{hoveredProfileData.profile.followers || '45K'}</p>
+                  <p className="text-[10px] text-slate-400">followers</p>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900">{hoveredProfileData.profile.followingCount || '290'}</p>
+                  <p className="text-[10px] text-slate-400">following</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="w-full py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs flex items-center justify-center gap-1 transition shadow-xs cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" /> Follow on Instagram
+              </button>
+            </div>
+          ) : (
+            /* Facebook Profile Card */
+            <div className="w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden pointer-events-auto">
+              <div className="h-14 bg-gradient-to-r from-blue-600 to-indigo-600 relative"></div>
+              <div className="px-4 pb-4 pt-0 space-y-2.5 relative">
+                <div className="-mt-7 flex items-end justify-between">
+                  <div className="relative">
+                    <img
+                      src={hoveredProfileData.profile.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'}
+                      alt="Avatar"
+                      className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md"
+                    />
+                    {hoveredProfileData.profile.verified && (
+                      <div className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-0.5 shadow-xs">
+                        <CheckCircle2 className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    {hoveredProfileData.profile.type === 'page' ? 'Facebook Page' : 'Facebook Profile'}
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1">
+                    <p className="font-bold text-sm text-slate-900 truncate">{hoveredProfileData.profile.name}</p>
+                    {hoveredProfileData.profile.verified && (
+                      <BadgeCheck className="w-3.5 h-3.5 text-blue-600 fill-blue-600 text-white flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">{hoveredProfileData.profile.subtitle}</p>
+                </div>
+
+                {hoveredProfileData.profile.bio && (
+                  <p className="text-xs text-slate-700 leading-snug">
+                    {hoveredProfileData.profile.bio}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                  <button
+                    type="button"
+                    className="flex-1 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center justify-center gap-1 transition shadow-xs cursor-pointer"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" /> Follow
+                  </button>
+                  <button
+                    type="button"
+                    className="flex-1 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1 transition cursor-pointer"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Message
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
