@@ -13,28 +13,31 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const accountId = searchParams.get('accountId');
 
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'accountId is required' },
-        { status: 400 }
-      );
+    let account = null;
+    if (accountId) {
+      account = await prisma.socialAccount.findFirst({
+        where: {
+          userId: user.id,
+          platform: 'WORDPRESS',
+          OR: [
+            { id: accountId },
+            { accountId: accountId },
+          ],
+        },
+      });
+    } else {
+      account = await prisma.socialAccount.findFirst({
+        where: {
+          userId: user.id,
+          platform: 'WORDPRESS',
+        },
+      });
     }
-
-    const account = await prisma.socialAccount.findFirst({
-      where: { id: accountId, userId: user.id },
-    });
 
     if (!account) {
       return NextResponse.json(
-        { error: 'Account not found' },
+        { error: 'No connected WordPress account found.' },
         { status: 404 }
-      );
-    }
-
-    if (account.platform !== 'WORDPRESS') {
-      return NextResponse.json(
-        { error: 'Specified account is not a WordPress site' },
-        { status: 400 }
       );
     }
 

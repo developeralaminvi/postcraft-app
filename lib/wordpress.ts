@@ -29,7 +29,7 @@ export interface PublishWordPressPostParams {
   credentials: string; // `username:::appPassword` or base64
   title?: string;
   content: string; // HTML supported
-  status?: 'publish' | 'future' | 'draft' | 'pending';
+  status?: 'publish' | 'future' | 'draft' | 'pending' | 'private';
   scheduledAt?: string | Date | null;
   categories?: (number | string)[];
   tags?: (number | string)[];
@@ -211,12 +211,21 @@ export async function getWordPressCategories(
       return [];
     }
 
-    return categories.map((cat: any) => ({
-      id: Number(cat.id),
-      name: String(cat.name || 'Uncategorized'),
-      slug: String(cat.slug || ''),
-      count: Number(cat.count || 0),
-    }));
+    return categories.map((cat: any) => {
+      const rawName = String(cat.name || 'Uncategorized');
+      const cleanName = rawName
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'");
+      return {
+        id: Number(cat.id),
+        name: cleanName,
+        slug: String(cat.slug || ''),
+        count: Number(cat.count || 0),
+      };
+    });
   } catch (err) {
     console.error('Error fetching WordPress categories:', err);
     return [];
@@ -366,7 +375,11 @@ export async function publishWordPressPost(params: PublishWordPressPostParams): 
     let postDate: string | undefined;
 
     if (scheduledAt) {
-      effectiveStatus = 'future';
+      if (status === 'draft' || status === 'private') {
+        effectiveStatus = status;
+      } else {
+        effectiveStatus = 'future';
+      }
       postDate = new Date(scheduledAt).toISOString();
     }
 

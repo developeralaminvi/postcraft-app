@@ -118,6 +118,10 @@ export async function POST(req: NextRequest) {
           ? (custom as any).excerpt
           : excerpt;
 
+        const effectiveWpStatus = (isCustom && (custom as any)?.wpStatus !== undefined)
+          ? (custom as any).wpStatus
+          : (wpStatus || 'publish');
+
         const effectiveMediaUrl = (isCustom && custom?.mediaUrl !== undefined)
           ? (custom.mediaUrl?.trim() || null)
           : (mediaUrl?.trim() || null);
@@ -155,7 +159,7 @@ export async function POST(req: NextRequest) {
               credentials: account.accessToken,
               title: effectiveTitle || 'Untitled Post',
               content: effectiveContent,
-              status: (wpStatus as any) || 'publish',
+              status: effectiveWpStatus as any,
               scheduledAt: !publishNow && scheduledAt ? new Date(scheduledAt) : null,
               categories: Array.isArray(effectiveCategories) ? effectiveCategories : undefined,
               tags: Array.isArray(effectiveTags) ? effectiveTags : undefined,
@@ -220,6 +224,7 @@ export async function POST(req: NextRequest) {
               ? effectiveTags
               : null,
             excerpt: effectiveExcerpt,
+            wpStatus: effectiveWpStatus,
             status: postStatus,
             scheduledAt: !publishNow && scheduledAt ? new Date(scheduledAt) : null,
             publishedAt: publishedDate,

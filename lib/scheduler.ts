@@ -77,7 +77,7 @@ export async function processDuePosts() {
           credentials: post.account.accessToken,
           title: post.title || 'Untitled Post',
           content: post.content,
-          status: 'publish',
+          status: (post.wpStatus as any) || 'publish',
           categories: parsedCategories,
           tags: parsedTags,
           mediaUrl: post.mediaUrl,

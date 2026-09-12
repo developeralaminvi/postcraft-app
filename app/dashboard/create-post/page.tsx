@@ -42,6 +42,9 @@ import {
   FileText,
   Eye,
   FileCode,
+  Lock,
+  RefreshCw,
+  Search,
 } from 'lucide-react';
 
 interface Account {
@@ -68,7 +71,7 @@ interface ChannelCustomization {
   categories?: number[];
   tags?: string;
   excerpt?: string;
-  wpStatus?: 'publish' | 'future' | 'draft' | 'pending';
+  wpStatus?: 'publish' | 'future' | 'draft' | 'pending' | 'private';
   mediaUrl: string;
   mediaType: 'TEXT' | 'IMAGE' | 'VIDEO';
   enableFirstComment: boolean;
@@ -88,10 +91,10 @@ export default function CreatePostPage() {
   // Master Post States
   const [masterTitle, setMasterTitle] = useState('');
   const [masterContent, setMasterContent] = useState('');
-  const [masterCategories, setMasterCategories] = useState<number[]>([1]);
+  const [masterCategories, setMasterCategories] = useState<number[]>([]);
   const [masterTags, setMasterTags] = useState('');
   const [masterExcerpt, setMasterExcerpt] = useState('');
-  const [masterWpStatus, setMasterWpStatus] = useState<'publish' | 'future' | 'draft' | 'pending'>('publish');
+  const [masterWpStatus, setMasterWpStatus] = useState<'publish' | 'future' | 'draft' | 'pending' | 'private'>('publish');
   const [masterMediaUrl, setMasterMediaUrl] = useState('');
   const [masterMediaType, setMasterMediaType] = useState<'TEXT' | 'IMAGE' | 'VIDEO'>('TEXT');
   const [masterEnableFirstComment, setMasterEnableFirstComment] = useState(true);
@@ -99,12 +102,8 @@ export default function CreatePostPage() {
   const [masterFirstCommentDelay, setMasterFirstCommentDelay] = useState<number>(0);
 
   // WordPress Specific Categories & Inline Editor States
-  const [wpCategories, setWpCategories] = useState<Array<{ id: number; name: string; slug: string; count?: number }>>([
-    { id: 1, name: 'Technology', slug: 'tech', count: 28 },
-    { id: 2, name: 'Web Development', slug: 'web-dev', count: 34 },
-    { id: 3, name: 'AI & Automation', slug: 'ai-automation', count: 42 },
-    { id: 4, name: 'Digital Marketing', slug: 'digital-marketing', count: 19 },
-  ]);
+  const [wpCategories, setWpCategories] = useState<Array<{ id: number; name: string; slug: string; count?: number }>>([]);
+  const [categorySearch, setCategorySearch] = useState('');
   const [loadingWpCategories, setLoadingWpCategories] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [editorMode, setEditorMode] = useState<'code' | 'visual'>('code');
@@ -560,7 +559,7 @@ export default function CreatePostPage() {
     }
   };
 
-  const updateActiveWpStatus = (status: 'publish' | 'future' | 'draft' | 'pending') => {
+  const updateActiveWpStatus = (status: 'publish' | 'future' | 'draft' | 'pending' | 'private') => {
     if (isMaster) {
       setMasterWpStatus(status);
     } else {
@@ -1132,24 +1131,31 @@ export default function CreatePostPage() {
   }, [searchParams]);
 
   // Load WordPress categories when WordPress accounts are selected
+  const fetchWpCategories = async (accountId?: string) => {
+    setLoadingWpCategories(true);
+    try {
+      const url = accountId ? `/api/wordpress/categories?accountId=${accountId}` : '/api/wordpress/categories';
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.categories && data.categories.length > 0) {
+        setWpCategories(data.categories);
+        setMasterCategories((prev) => (prev.length === 0 ? [data.categories[0].id] : prev));
+      }
+    } catch (err) {
+      console.error('Failed to load WordPress categories:', err);
+    } finally {
+      setLoadingWpCategories(false);
+    }
+  };
+
   useEffect(() => {
-    const wpAcc = accounts.find(
-      (a) => (isMaster ? selectedAccountIds.includes(a.id) : a.id === activeTab) && a.platform === 'WORDPRESS'
-    );
+    const wpAcc =
+      accounts.find(
+        (a) => (isMaster ? selectedAccountIds.includes(a.id) : a.id === activeTab) && a.platform === 'WORDPRESS'
+      ) || accounts.find((a) => a.platform === 'WORDPRESS');
+
     if (wpAcc) {
-      setLoadingWpCategories(true);
-      fetch(`/api/wordpress/categories?accountId=${wpAcc.id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.categories && data.categories.length > 0) {
-            setWpCategories(data.categories);
-            if (masterCategories.length === 0) {
-              setMasterCategories([data.categories[0].id]);
-            }
-          }
-        })
-        .catch(console.error)
-        .finally(() => setLoadingWpCategories(false));
+      fetchWpCategories(wpAcc.id);
     }
   }, [accounts, selectedAccountIds, activeTab, isMaster]);
 
@@ -1865,125 +1871,308 @@ export default function CreatePostPage() {
             </div>
           </div>
 
-          {/* WordPress Post Settings (Categories, Tags, Excerpt, Status) */}
+          {/* WordPress Article & Publishing Controls */}
           {isWordPressActive && (
-            <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-xs space-y-4 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-lg bg-blue-50 text-[#21759B] flex items-center justify-center font-bold">
-                    <Tag className="w-4 h-4" />
+            <div className="bg-gradient-to-br from-white to-blue-50/40 p-6 rounded-2xl border border-blue-200/80 shadow-xs space-y-6 animate-in fade-in">
+              {/* Header with Site Info & Refresh */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-blue-100">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-[#21759B] text-white flex items-center justify-center font-bold shadow-xs">
+                    <FileText className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm text-slate-900">WordPress Post Settings</h3>
-                    <p className="text-[11px] text-slate-500">
-                      Categories, tags, excerpt and publication status
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm sm:text-base text-slate-900">WordPress Article & Publishing Controls</h3>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#21759B]">
+                        Live WordPress Sync
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {accounts.find((a) => a.platform === 'WORDPRESS')?.name
+                        ? `সংযুক্ত সাইট: ${accounts.find((a) => a.platform === 'WORDPRESS')?.name} (${accounts.find((a) => a.platform === 'WORDPRESS')?.pageId || accounts.find((a) => a.platform === 'WORDPRESS')?.accountId})`
+                        : 'ওয়ার্ডপ্রেস সাইটের জন্য ক্যাটাগরি, শিডিউলিং ও দৃশ্যমানতা নিয়ন্ত্রণ করুন'}
                     </p>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#21759B]">
-                  WordPress Options
-                </span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const wpAcc = accounts.find((a) => a.platform === 'WORDPRESS');
+                    if (wpAcc) fetchWpCategories(wpAcc.id);
+                  }}
+                  disabled={loadingWpCategories}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-blue-50 text-[#21759B] font-semibold text-xs border border-blue-200 shadow-2xs transition cursor-pointer disabled:opacity-50"
+                  title="ওয়ার্ডপ্রেস থেকে ক্যাটাগরি পুনরায় লোড করুন"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingWpCategories ? 'animate-spin' : ''}`} />
+                  <span>ক্যাটাগরি রিফ্রেশ</span>
+                </button>
               </div>
 
-              {/* Categories Selector */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Categories (পোস্টের ক্যাটাগরি)
+              {/* 1. Category Selection */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-[#21759B]" /> পোস্টের ক্যাটাগরি সিলেক্ট করুন (Categories)
                   </label>
-                  {loadingWpCategories && (
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Loading categories...
-                    </span>
-                  )}
+                  <span className="text-xs text-slate-500 font-medium">
+                    {currentCategories.length} টি ক্যাটাগরি নির্বাচিত
+                  </span>
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {wpCategories.length > 0 ? (
-                    wpCategories.map((cat) => {
-                      const isSelected = (currentCategories || []).includes(cat.id);
-                      return (
-                        <button
-                          key={cat.id}
-                          type="button"
-                          onClick={() => {
-                            const current = currentCategories || [];
-                            if (isSelected) {
-                              updateActiveCategories(current.filter((id) => id !== cat.id));
-                            } else {
-                              updateActiveCategories([...current, cat.id]);
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition border flex items-center gap-1.5 cursor-pointer ${
-                            isSelected
-                              ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs'
-                              : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                {/* Optional category search if categories > 4 */}
+                {wpCategories.length > 4 && (
+                  <div className="relative max-w-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                      placeholder="ক্যাটাগরি খুঁজুন..."
+                      className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#21759B] bg-white"
+                    />
+                  </div>
+                )}
+
+                {loadingWpCategories ? (
+                  <div className="p-6 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center justify-center gap-2 text-xs text-[#21759B] font-semibold">
+                    <Loader2 className="w-4 h-4 animate-spin" /> ওয়ার্ডপ্রেস সাইট থেকে ক্যাটাগরি আনা হচ্ছে...
+                  </div>
+                ) : wpCategories.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {wpCategories
+                      .filter((c) => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()))
+                      .map((cat) => {
+                        const isSelected = (currentCategories || []).includes(cat.id);
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              const current = currentCategories || [];
+                              if (isSelected) {
+                                updateActiveCategories(current.filter((id) => id !== cat.id));
+                              } else {
+                                updateActiveCategories([...current, cat.id]);
+                              }
+                            }}
+                            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border flex items-center gap-2 cursor-pointer ${
+                              isSelected
+                                ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs ring-2 ring-blue-300/60 scale-[1.02]'
+                                : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                            }`}
+                          >
+                            <span
+                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                                isSelected ? 'bg-white text-[#21759B]' : 'bg-slate-100 text-slate-400'
+                              }`}
+                            >
+                              {isSelected ? <Check className="w-3 h-3 stroke-[3]" /> : '+'}
+                            </span>
+                            <span>{cat.name}</span>
+                            {cat.count !== undefined && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                  isSelected ? 'bg-blue-700/60 text-white' : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {cat.count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                    কোনো ক্যাটাগরি পাওয়া যায়নি। ডিফল্ট ক্যাটাগরি (Uncategorized) ব্যবহার করা হবে।
+                  </div>
+                )}
+              </div>
+
+              {/* 2. WordPress Post Visibility & Status Cards */}
+              <div className="space-y-3 pt-2">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Globe className="w-4 h-4 text-[#21759B]" /> পোস্টের দৃশ্যমানতা ও স্ট্যাটাস নির্বাচন করুন
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* Public */}
+                  <div
+                    onClick={() => updateActiveWpStatus('publish')}
+                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                      currentWpStatus === 'publish'
+                        ? 'border-emerald-500 bg-emerald-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`p-1.5 rounded-lg ${
+                            currentWpStatus === 'publish' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
                           }`}
                         >
-                          {isSelected && <Check className="w-3 h-3 stroke-[2.5]" />}
-                          <span>{cat.name}</span>
-                          {cat.count !== undefined && (
-                            <span className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                              ({cat.count})
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <p className="text-xs text-slate-400 italic">
-                      Default WordPress category (Uncategorized) will be used if none selected.
+                          <Globe className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <p className="font-bold text-xs text-slate-900">Public (পাবলিক)</p>
+                          <span className="text-[10px] text-emerald-700 font-semibold">সবার জন্য উন্মুক্ত</span>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        checked={currentWpStatus === 'publish'}
+                        onChange={() => updateActiveWpStatus('publish')}
+                        className="text-emerald-600 focus:ring-emerald-500 mt-1 cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                      {publishMode === 'schedule'
+                        ? 'নির্ধারিত শিডিউল টাইমে সরাসরি সবার জন্য লাইভ হয়ে যাবে।'
+                        : 'পোস্ট করার সাথে সাথে ওয়েবসাইটে সবার জন্য লাইভ দেখা যাবে।'}
                     </p>
-                  )}
+                  </div>
+
+                  {/* Private */}
+                  <div
+                    onClick={() => updateActiveWpStatus('private')}
+                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                      currentWpStatus === 'private'
+                        ? 'border-amber-500 bg-amber-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`p-1.5 rounded-lg ${
+                            currentWpStatus === 'private' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <Lock className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <p className="font-bold text-xs text-slate-900">Private (প্রাইভেট)</p>
+                          <span className="text-[10px] text-amber-700 font-semibold">গোপন পোস্ট</span>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        checked={currentWpStatus === 'private'}
+                        onChange={() => updateActiveWpStatus('private')}
+                        className="text-amber-600 focus:ring-amber-500 mt-1 cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                      শুধুমাত্র সাইটের অ্যাডমিন ও লগইন করা অথর দেখতে পারবেন। সাধারণ পাঠকরা দেখতে পাবে না।
+                    </p>
+                  </div>
+
+                  {/* Draft */}
+                  <div
+                    onClick={() => updateActiveWpStatus('draft')}
+                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                      currentWpStatus === 'draft'
+                        ? 'border-blue-500 bg-blue-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`p-1.5 rounded-lg ${
+                            currentWpStatus === 'draft' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <p className="font-bold text-xs text-slate-900">Draft (ড্রাফট)</p>
+                          <span className="text-[10px] text-blue-700 font-semibold">খসড়া হিসেবে জমা</span>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        checked={currentWpStatus === 'draft'}
+                        onChange={() => updateActiveWpStatus('draft')}
+                        className="text-blue-600 focus:ring-blue-500 mt-1 cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                      ওয়ার্ডপ্রেস ব্যাকএন্ডে ড্রাফট হিসেবে জমা থাকবে। পরে এডিট বা প্রকাশ করা যাবে।
+                    </p>
+                  </div>
+
+                  {/* Pending Review */}
+                  <div
+                    onClick={() => updateActiveWpStatus('pending')}
+                    className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                      currentWpStatus === 'pending'
+                        ? 'border-purple-500 bg-purple-50/60 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`p-1.5 rounded-lg ${
+                            currentWpStatus === 'pending' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          <Clock className="w-4 h-4" />
+                        </span>
+                        <div>
+                          <p className="font-bold text-xs text-slate-900">Pending Review</p>
+                          <span className="text-[10px] text-purple-700 font-semibold">অনুমোদনের অপেক্ষায়</span>
+                        </div>
+                      </div>
+                      <input
+                        type="radio"
+                        checked={currentWpStatus === 'pending'}
+                        onChange={() => updateActiveWpStatus('pending')}
+                        className="text-purple-600 focus:ring-purple-500 mt-1 cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
+                      পর্যালোচনার জন্য জমা থাকবে। সিনিয়র এডিটর বা অ্যাডমিনের অনুমোদনের পর প্রকাশিত হবে।
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Tags & Status Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 3. Post Tags & Excerpt */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-blue-100">
                 {/* Tags */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Post Tags (Comma separated)
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-slate-400" /> Post Tags (ট্যাগ - কমা দিয়ে আলাদা করুন)
                   </label>
                   <input
                     type="text"
                     value={currentTags}
                     onChange={(e) => updateActiveTags(e.target.value)}
-                    placeholder="marketing, tech, news"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B]"
+                    placeholder="যেমন: wordpress, technology, web dev"
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">ওয়ার্ডপ্রেসের ট্যাগে যুক্ত হবে</p>
                 </div>
 
-                {/* WordPress Post Status */}
+                {/* Excerpt */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    WordPress Post Status
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Post Excerpt / সারসংক্ষেপ (ঐচ্ছিক)
                   </label>
-                  <select
-                    value={currentWpStatus}
-                    onChange={(e) => updateActiveWpStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-800 font-medium"
-                  >
-                    <option value="publish">Publish (পাবলিশ / সরাসরি লাইভ)</option>
-                    <option value="future">Scheduled (শিডিউল অনুযায়ী)</option>
-                    <option value="draft">Draft (ড্রাফট হিসেবে সেভ)</option>
-                    <option value="pending">Pending Review (রিভিউ পেন্ডিং)</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={currentExcerpt}
+                    onChange={(e) => updateActiveExcerpt(e.target.value)}
+                    placeholder="পোস্টের সংক্ষিপ্ত বিবরণ যা ব্লগ পেজে এবং গুগল সার্চে শো করবে..."
+                    className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">ব্লগ গ্রিড ও সার্চ ইঞ্জিনের মেটা ডেসক্রিপশনে সাহায্য করে</p>
                 </div>
-              </div>
-
-              {/* Excerpt */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Post Excerpt / Summary (ঐচ্ছিক)
-                </label>
-                <input
-                  type="text"
-                  value={currentExcerpt}
-                  onChange={(e) => updateActiveExcerpt(e.target.value)}
-                  placeholder="Brief summary of the article for blog archives and search engines..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B]"
-                />
               </div>
             </div>
           )}
@@ -2388,9 +2577,29 @@ export default function CreatePostPage() {
                         </p>
                       </div>
                     </div>
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-[#21759B] text-white uppercase tracking-wider">
-                      {previewData.wpStatus || 'Publish'}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {publishMode === 'schedule' ? (
+                        <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500 text-white flex items-center gap-1 shadow-xs uppercase tracking-wider">
+                          <Clock className="w-2.5 h-2.5" /> Scheduled: {previewData.wpStatus === 'private' ? 'Private' : previewData.wpStatus === 'draft' ? 'Draft' : previewData.wpStatus === 'pending' ? 'Pending' : 'Public'}
+                        </span>
+                      ) : previewData.wpStatus === 'private' ? (
+                        <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500 text-white flex items-center gap-1 shadow-xs uppercase tracking-wider">
+                          <Lock className="w-2.5 h-2.5" /> Private
+                        </span>
+                      ) : previewData.wpStatus === 'draft' ? (
+                        <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-slate-600 text-white flex items-center gap-1 shadow-xs uppercase tracking-wider">
+                          <FileText className="w-2.5 h-2.5" /> Draft
+                        </span>
+                      ) : previewData.wpStatus === 'pending' ? (
+                        <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-purple-600 text-white flex items-center gap-1 shadow-xs uppercase tracking-wider">
+                          <Clock className="w-2.5 h-2.5" /> Pending
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-600 text-white flex items-center gap-1 shadow-xs uppercase tracking-wider">
+                          <Globe className="w-2.5 h-2.5" /> Live Public
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Blog Header & Title */}

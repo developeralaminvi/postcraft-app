@@ -50,6 +50,7 @@ model Post {
   categories      String?            // JSON string or comma-separated category IDs / names
   tags            String?            // JSON string or comma-separated tags
   excerpt         String?            // Optional summary / excerpt
+  wpStatus        String?            @default("publish") // publish, private, draft, pending, future
   reactionsCount  Int                @default(0)
   commentsCount   Int                @default(0)
   lastPolledAt    DateTime?
