@@ -121,6 +121,23 @@ export default function CreatePostPage() {
   const [publishMode, setPublishMode] = useState<'now' | 'schedule'>('now');
   const [scheduledAt, setScheduledAt] = useState('');
 
+  const getTodayDateStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const getTomorrowDateStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const [scheduleDate, setScheduleDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const [scheduleTime, setScheduleTime] = useState<string>('18:00');
+
   // Auto-Reply state (Smart Commenter Tagging)
   const [enableAutoReply, setEnableAutoReply] = useState(false);
   const [autoReplyText, setAutoReplyText] = useState(
@@ -1172,10 +1189,21 @@ export default function CreatePostPage() {
     if (paramDate) {
       setPublishMode('schedule');
       setScheduledAt(paramDate);
+      if (paramDate.includes('T')) {
+        const [d, t] = paramDate.split('T');
+        setScheduleDate(d);
+        setScheduleTime(t.slice(0, 5));
+      }
     } else {
       const d = new Date(Date.now() + 60 * 60 * 1000);
       d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-      setScheduledAt(d.toISOString().slice(0, 16));
+      const iso = d.toISOString().slice(0, 16);
+      setScheduledAt(iso);
+      if (iso.includes('T')) {
+        const [d, t] = iso.split('T');
+        setScheduleDate(d);
+        setScheduleTime(t.slice(0, 5));
+      }
     }
   }, [searchParams]);
 
@@ -1564,36 +1592,62 @@ export default function CreatePostPage() {
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 {socialAccounts.map((acc) => {
                   const isSelected = selectedAccountIds.includes(acc.id);
+                  const isFb = acc.platform === 'FACEBOOK';
+                  const isIg = acc.platform === 'INSTAGRAM';
+                  const isLi = acc.platform === 'LINKEDIN';
+
                   return (
                     <button
                       key={acc.id}
                       type="button"
                       onClick={() => toggleAccountSelection(acc.id)}
-                      className={`group relative flex items-center gap-3 p-2 pr-3.5 rounded-2xl border transition text-left cursor-pointer ${
+                      className={`group relative flex items-center gap-3 p-2.5 pr-4 rounded-2xl border transition-all text-left cursor-pointer ${
                         isSelected
-                          ? 'border-indigo-500 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/20'
-                          : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100 opacity-60 hover:opacity-90'
+                          ? isFb
+                            ? 'border-[#1877F2] bg-blue-50/90 text-blue-900 shadow-sm shadow-blue-300/30 ring-2 ring-[#1877F2]/40'
+                            : isIg
+                            ? 'border-pink-500 bg-gradient-to-tr from-amber-50/80 via-pink-50/80 to-purple-50/80 text-pink-950 shadow-sm shadow-pink-300/30 ring-2 ring-pink-500/40'
+                            : isLi
+                            ? 'border-[#0A66C2] bg-sky-50/90 text-sky-950 shadow-sm shadow-sky-300/30 ring-2 ring-[#0A66C2]/40'
+                            : 'border-indigo-500 bg-indigo-50/90 text-indigo-950 shadow-sm shadow-indigo-300/30 ring-2 ring-indigo-500/40'
+                          : 'filter grayscale contrast-75 opacity-40 hover:grayscale-0 hover:opacity-85 border-dashed border-slate-300 bg-slate-100/60 shadow-none'
                       }`}
                     >
                       <div className="relative">
-                        <ChannelAvatar
-                          avatar={acc.avatar}
-                          name={acc.name}
-                          platform={acc.platform}
-                          size="md"
-                        />
-                        {isSelected && (
-                          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xs border-2 border-white">
+                        <div className={isSelected ? 'filter-none transition-all' : 'filter grayscale transition-all'}>
+                          <ChannelAvatar
+                            avatar={acc.avatar}
+                            name={acc.name}
+                            platform={acc.platform}
+                            size="md"
+                          />
+                        </div>
+                        {isSelected ? (
+                          <span
+                            className={`absolute -top-1 -right-1 h-4 w-4 rounded-full text-white flex items-center justify-center shadow-xs border-2 border-white ${
+                              isFb
+                                ? 'bg-[#1877F2]'
+                                : isIg
+                                ? 'bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600'
+                                : isLi
+                                ? 'bg-[#0A66C2]'
+                                : 'bg-indigo-600'
+                            }`}
+                          >
                             <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </span>
+                        ) : (
+                          <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-slate-300 text-slate-600 flex items-center justify-center text-[10px] font-bold border-2 border-white">
+                            +
                           </span>
                         )}
                       </div>
                       <div className="min-w-0">
-                        <p className={`text-xs font-bold truncate max-w-[130px] ${isSelected ? 'text-slate-900' : 'text-slate-600'}`}>
+                        <p className={`text-xs font-bold truncate max-w-[140px] ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>
                           {acc.name}
                         </p>
-                        <p className="text-[10px] text-slate-400 capitalize truncate">
-                          {acc.category?.toLowerCase().includes('profile') ? '👤 Profile' : '🏢 Page'} • {acc.platform.toLowerCase()}
+                        <p className={`text-[10px] capitalize truncate ${isSelected ? 'text-slate-600 font-semibold' : 'text-slate-400'}`}>
+                          {isSelected ? '✓ সিলেক্টেড' : 'ক্লিক করে যুক্ত করুন'} • {acc.platform.toLowerCase()}
                         </p>
                       </div>
                     </button>
@@ -1615,9 +1669,9 @@ export default function CreatePostPage() {
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
-              <span>All Selected Channels</span>
+              <span>একসাথে সব চ্যানেলে (Master)</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                   isMaster ? 'bg-indigo-700/80 text-white' : 'bg-slate-100 text-slate-600'
                 }`}
               >
@@ -1651,14 +1705,24 @@ export default function CreatePostPage() {
                       size="xs"
                       showBadge={true}
                     />
-                    <span className="truncate max-w-[120px]">{acc.name}</span>
-                    {isCustom && (
+                    <span className="truncate max-w-[120px] font-bold">{acc.name}</span>
+                    {isCustom ? (
                       <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                          isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
+                          isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
                         }`}
+                        title="আলাদা কাস্টম এডিট করা হচ্ছে"
                       >
-                        Customized
+                        🔓 কাস্টম
+                      </span>
+                    ) : (
+                      <span
+                        className={`text-[9px] px-1 py-0.5 rounded-md flex items-center gap-0.5 ${
+                          isActive ? 'text-slate-300' : 'text-slate-400'
+                        }`}
+                        title="মাস্টার পোস্টের সাথে লক করা"
+                      >
+                        <Lock className="w-2.5 h-2.5" /> লকড
                       </span>
                     )}
                   </button>
@@ -2281,17 +2345,124 @@ export default function CreatePostPage() {
                 </div>
 
                 {publishMode === 'schedule' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-[#21759B] font-medium bg-white"
-                    />
+                  <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100/90 space-y-4">
+                    {/* Date Selector */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-[#21759B]" /> কোন তারিখে পোস্ট হবে? (Select Date)
+                        </label>
+                        <span className="text-[11px] font-bold text-[#21759B] bg-white px-2 py-0.5 rounded-full border border-blue-200">
+                          {scheduleDate === getTodayDateStr()
+                            ? '⚡ আজকে (Today)'
+                            : scheduleDate === getTomorrowDateStr()
+                            ? '📅 কালকে (Tomorrow)'
+                            : `তারিখ: ${scheduleDate}`}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const today = getTodayDateStr();
+                            setScheduleDate(today);
+                            setScheduledAt(`${today}T${scheduleTime}`);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            scheduleDate === getTodayDateStr()
+                              ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          ⚡ আজকে (Today)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tomorrow = getTomorrowDateStr();
+                            setScheduleDate(tomorrow);
+                            setScheduledAt(`${tomorrow}T${scheduleTime}`);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            scheduleDate === getTomorrowDateStr()
+                              ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          📅 কালকে (Tomorrow)
+                        </button>
+
+                        <div className="relative">
+                          <input
+                            type="date"
+                            min={getTodayDateStr()}
+                            value={scheduleDate}
+                            onChange={(e) => {
+                              setScheduleDate(e.target.value);
+                              setScheduledAt(`${e.target.value}T${scheduleTime}`);
+                            }}
+                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                              scheduleDate !== getTodayDateStr() && scheduleDate !== getTomorrowDateStr()
+                                ? 'bg-[#21759B] text-white border-[#21759B]'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Time Selector */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#21759B]" /> কয়টা বাজে পোস্ট হবে? (Select Time)
+                        </label>
+                        <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                          সময়: {scheduleTime}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2.5">
+                        {[
+                          { label: 'সকাল ০৯:০০', time: '09:00', icon: '🌅' },
+                          { label: 'দুপুর ০১:০০', time: '13:00', icon: '☀️' },
+                          { label: 'সন্ধ্যা ০৬:০০', time: '18:00', icon: '🌆' },
+                          { label: 'রাত ০৮:৩০', time: '20:30', icon: '🌙' },
+                        ].map((slot) => (
+                          <button
+                            key={slot.time}
+                            type="button"
+                            onClick={() => {
+                              setScheduleTime(slot.time);
+                              setScheduledAt(`${scheduleDate}T${slot.time}`);
+                            }}
+                            className={`py-2 px-2 rounded-xl border text-[11px] font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
+                              scheduleTime === slot.time
+                                ? 'bg-[#21759B] text-white border-[#21759B] shadow-xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>{slot.icon}</span>
+                            <span>{slot.label}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-xs text-slate-500 font-medium">নির্দিষ্ট সময়:</span>
+                        <input
+                          type="time"
+                          value={scheduleTime}
+                          onChange={(e) => {
+                            setScheduleTime(e.target.value);
+                            setScheduledAt(`${scheduleDate}T${e.target.value}`);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-900 focus:ring-2 focus:ring-[#21759B]"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -2319,38 +2490,82 @@ export default function CreatePostPage() {
           ) : (
             /* ===================== SOCIAL MEDIA COMPOSER ===================== */
             <>
-              {/* Active Channel Customization Notification Banner */}
-              {!isMaster && activeAccount && (
-                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900 animate-in fade-in">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <ChannelAvatar
-                      avatar={activeAccount.avatar}
-                      name={activeAccount.name}
-                      platform={activeAccount.platform}
-                      size="sm"
-                    />
-                    <div className="min-w-0">
-                      <p className="font-bold truncate">
-                        Customizing exclusively for {activeAccount.name} ({activeAccount.platform})
-                      </p>
-                      <p className="text-[11px] text-amber-700">
-                        Changes made here override the master post content for this channel only.
-                      </p>
+              {/* Active Channel Customization / Lock Notification Banner */}
+              {!isMaster && activeAccount && (() => {
+                const isCustom = !!customizations[activeAccount.id]?.isCustomized;
+                return isCustom ? (
+                  /* UNLOCKED STATE */
+                  <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-300 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 animate-in fade-in">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-base shadow-xs flex-shrink-0">
+                        🔓
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-amber-950">
+                            {activeAccount.name} ({activeAccount.platform}): আলাদা কন্টেন্ট এডিট মোড সক্রিয়
+                          </p>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                            আনলকড (Custom Active)
+                          </span>
+                        </div>
+                        <p className="text-xs text-amber-800 font-medium mt-0.5">
+                          এখানে লেখা ক্যাপশন ও মিডিয়া শুধুমাত্র এই {activeAccount.platform} চ্যানেলেই পোস্ট হবে।
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  {customizations[activeAccount.id]?.isCustomized && (
                     <button
                       type="button"
                       onClick={() => resetChannelToMaster(activeAccount.id)}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition text-[11px] flex-shrink-0 cursor-pointer shadow-2xs"
-                      title="Revert to master caption and media"
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition text-xs flex-shrink-0 cursor-pointer shadow-xs"
+                      title="মাস্টার পোস্টের সাথে পুনরায় লক এবং সিঙ্ক করুন"
                     >
-                      <RotateCcw className="w-3 h-3" /> Reset to Master
+                      <RotateCcw className="w-3.5 h-3.5" /> 🔒 পুনরায় লক করুন (মাস্টার সিঙ্ক)
                     </button>
-                  )}
-                </div>
-              )}
+                  </div>
+                ) : (
+                  /* LOCKED STATE (Default) */
+                  <div className="p-4 rounded-2xl bg-slate-100 border border-slate-300 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-800 animate-in fade-in">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-slate-700 text-white flex items-center justify-center font-bold text-base shadow-xs flex-shrink-0">
+                        🔒
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-slate-900">
+                            {activeAccount.name} ({activeAccount.platform}): মাস্টার পোস্টের সাথে লক করা আছে
+                          </p>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300">
+                            লকড (Locked to Master)
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium mt-0.5">
+                          এই অ্যাকাউন্টের কন্টেন্ট মূল পোস্টের সাথে সিঙ্ক করা। মূল পোস্টে যা লিখবেন, এখানেও তাই অটোমেটিক থাকবে।
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomizations((prev) => ({
+                          ...prev,
+                          [activeAccount.id]: {
+                            ...getEffectiveChannelData(activeAccount.id),
+                            isCustomized: true,
+                          },
+                        }));
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition text-xs flex-shrink-0 cursor-pointer shadow-xs"
+                      title="এই প্ল্যাটফর্মের জন্য আলাদা কন্টেন্ট লিখতে আনলক করুন"
+                    >
+                      <span>🔓 আনলক করে আলাদা কন্টেন্ট লিখুন</span>
+                    </button>
+                  </div>
+                );
+              })()}
+
 
               {/* Composer Main Box */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
@@ -2380,28 +2595,75 @@ export default function CreatePostPage() {
                     ))}
                   </div>
 
-                  <textarea
-                    ref={contentRef}
-                    required
-                    rows={4}
-                    value={currentContent}
-                    onChange={(e) =>
-                      handleInputChangeWithMention('content', e.target.value, e.target.selectionStart)
-                    }
-                    onKeyUp={(e) =>
-                      handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
-                    }
-                    onClick={(e) =>
-                      handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart)
-                    }
-                    placeholder={
-                      isMaster
-                        ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
-                        : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
-                    }
-                    className="w-full p-3.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition leading-relaxed text-slate-900"
-                  />
-                  {renderMentionDropdown('content')}
+                  {(() => {
+                    const isChannelLocked = Boolean(!isMaster && activeAccount && !customizations[activeAccount.id]?.isCustomized);
+
+                    return (
+                      <>
+                        <textarea
+                          ref={contentRef}
+                          required={!isChannelLocked}
+                          readOnly={isChannelLocked}
+                          rows={4}
+                          value={currentContent}
+                          onChange={(e) => {
+                            if (!isChannelLocked) {
+                              handleInputChangeWithMention('content', e.target.value, e.target.selectionStart);
+                            }
+                          }}
+                          onKeyUp={(e) => {
+                            if (!isChannelLocked) {
+                              handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart);
+                            }
+                          }}
+                          onClick={(e) => {
+                            if (!isChannelLocked) {
+                              handleInputChangeWithMention('content', (e.target as any).value, (e.target as any).selectionStart);
+                            }
+                          }}
+                          placeholder={
+                            isMaster
+                              ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
+                              : isChannelLocked
+                              ? `কন্টেন্ট মাস্টার পোস্টের সাথে লক করা আছে। আলাদা ক্যাপশন লিখতে নিচের আনলক বাটনে ক্লিক করুন...`
+                              : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
+                          }
+                          className={`w-full p-3.5 rounded-xl border text-sm leading-relaxed transition ${
+                            isChannelLocked
+                              ? 'border-dashed border-slate-300 bg-slate-50/90 text-slate-600 cursor-not-allowed'
+                              : 'border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500'
+                          }`}
+                        />
+                        {renderMentionDropdown('content')}
+
+                        {isChannelLocked && (
+                          <div className="mt-2 p-3 rounded-xl bg-indigo-50/80 border border-indigo-200/80 flex flex-wrap items-center justify-between gap-2 text-xs animate-in fade-in">
+                            <span className="text-indigo-950 font-medium flex items-center gap-1.5">
+                              <Lock className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                              এই ক্যাপশনটি মাস্টার পোস্টের সাথে লক করা আছে। আলাদা লিখতে চান?
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (activeAccount) {
+                                  setCustomizations((prev) => ({
+                                    ...prev,
+                                    [activeAccount.id]: {
+                                      ...getEffectiveChannelData(activeAccount.id),
+                                      isCustomized: true,
+                                    },
+                                  }));
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition text-xs cursor-pointer shadow-xs"
+                            >
+                              🔓 আনলক করে আলাদা ক্যাপশন লিখুন
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Direct Media Upload */}
@@ -2417,54 +2679,75 @@ export default function CreatePostPage() {
                     )}
                   </div>
 
-                  {!currentMediaUrl ? (
-                    <div
-                      onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
-                    >
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*,video/*"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
-                      <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition shadow-xs">
-                        {uploadingMedia ? (
-                          <Loader2 className="w-6 h-6 animate-spin" />
-                        ) : (
-                          <UploadCloud className="w-6 h-6" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {uploadingMedia ? 'Uploading media...' : 'Click to browse or drag & drop file'}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Supports JPG, PNG, GIF, WEBP or MP4, MOV videos
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group">
-                      {currentMediaType === 'VIDEO' ? (
-                        <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
+                  {(() => {
+                    const isChannelLocked = Boolean(!isMaster && activeAccount && !customizations[activeAccount.id]?.isCustomized);
+
+                    if (isChannelLocked) {
+                      return currentMediaUrl ? (
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900">
+                          {currentMediaType === 'VIDEO' ? (
+                            <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
+                          ) : (
+                            <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
+                          )}
+                          <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-xs text-white text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/20 flex items-center gap-1.5 shadow-md">
+                            <Lock className="w-3 h-3 text-amber-400" /> মাস্টার মিডিয়ার সাথে লকড
+                          </div>
+                        </div>
                       ) : (
-                        <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
-                      )}
-                      <button
-                        type="button"
-                        onClick={removeActiveMedia}
-                        className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-white transition shadow-md cursor-pointer"
-                        title="Remove media"
+                        <div className="border-2 border-dashed border-slate-200 bg-slate-50/70 rounded-2xl p-6 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
+                          <Lock className="w-6 h-6 text-slate-400" />
+                          <p className="font-semibold text-slate-700">মিডিয়া মাস্টার পোস্টের সাথে লক করা আছে</p>
+                          <p className="text-[11px] text-slate-400">এই চ্যানেলের জন্য আলাদা ছবি বা ভিডিও আপলোড করতে উপরে আনলক করুন।</p>
+                        </div>
+                      );
+                    }
+
+                    return !currentMediaUrl ? (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
                       >
-                        <X className="w-4 h-4" />
-                      </button>
-                      <span className="absolute bottom-3 left-3 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-900/80 text-white uppercase tracking-wider">
-                        {currentMediaType} Attached
-                      </span>
-                    </div>
-                  )}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                        <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition shadow-xs">
+                          {uploadingMedia ? (
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                          ) : (
+                            <UploadCloud className="w-6 h-6" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {uploadingMedia ? 'Uploading media...' : 'Click to browse or drag & drop file'}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Supports JPG, PNG, GIF, WEBP or MP4, MOV videos
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group">
+                        {currentMediaType === 'VIDEO' ? (
+                          <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
+                        ) : (
+                          <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={removeActiveMedia}
+                          className="absolute top-3 right-3 p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-lg transition flex items-center gap-1 text-xs font-semibold cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2745,19 +3028,137 @@ export default function CreatePostPage() {
                 </div>
 
                 {publishMode === 'schedule' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Date & Time
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 font-medium bg-white"
-                    />
+                  <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100/90 space-y-4">
+                    {/* 1. Date Selector: Today, Tomorrow, Custom */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-indigo-600" /> কোন তারিখে পোস্ট হবে? (Select Date)
+                        </label>
+                        <span className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-full border border-indigo-200">
+                          {scheduleDate === getTodayDateStr()
+                            ? '⚡ আজকে (Today)'
+                            : scheduleDate === getTomorrowDateStr()
+                            ? '📅 কালকে (Tomorrow)'
+                            : `তারিখ: ${scheduleDate}`}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const today = getTodayDateStr();
+                            setScheduleDate(today);
+                            setScheduledAt(`${today}T${scheduleTime}`);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            scheduleDate === getTodayDateStr()
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          ⚡ আজকে (Today)
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const tomorrow = getTomorrowDateStr();
+                            setScheduleDate(tomorrow);
+                            setScheduledAt(`${tomorrow}T${scheduleTime}`);
+                          }}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            scheduleDate === getTomorrowDateStr()
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          📅 কালকে (Tomorrow)
+                        </button>
+
+                        <div className="relative">
+                          <input
+                            type="date"
+                            min={getTodayDateStr()}
+                            value={scheduleDate}
+                            onChange={(e) => {
+                              setScheduleDate(e.target.value);
+                              setScheduledAt(`${e.target.value}T${scheduleTime}`);
+                            }}
+                            className={`w-full py-2 px-2.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                              scheduleDate !== getTodayDateStr() && scheduleDate !== getTomorrowDateStr()
+                                ? 'bg-indigo-600 text-white border-indigo-600 ring-2 ring-indigo-300'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. Time Selector: কয়টা বাজে পোস্ট হবে? */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-indigo-600" /> কয়টা বাজে পোস্ট হবে? (Select Time)
+                        </label>
+                        <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                          সময়: {scheduleTime}
+                        </span>
+                      </div>
+
+                      {/* Quick Popular Time Slots */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2.5">
+                        {[
+                          { label: 'সকাল ০৯:০০', time: '09:00', icon: '🌅' },
+                          { label: 'দুপুর ০১:০০', time: '13:00', icon: '☀️' },
+                          { label: 'সন্ধ্যা ০৬:০০', time: '18:00', icon: '🌆' },
+                          { label: 'রাত ০৮:৩০', time: '20:30', icon: '🌙' },
+                        ].map((slot) => (
+                          <button
+                            key={slot.time}
+                            type="button"
+                            onClick={() => {
+                              setScheduleTime(slot.time);
+                              setScheduledAt(`${scheduleDate}T${slot.time}`);
+                            }}
+                            className={`py-2 px-2 rounded-xl border text-[11px] font-semibold transition flex items-center justify-center gap-1 cursor-pointer ${
+                              scheduleTime === slot.time
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                            }`}
+                          >
+                            <span>{slot.icon}</span>
+                            <span>{slot.label}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Custom Exact Time Picker */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-xs text-slate-500 font-medium">নির্দিষ্ট সময় (Custom Time):</span>
+                        <input
+                          type="time"
+                          value={scheduleTime}
+                          onChange={(e) => {
+                            setScheduleTime(e.target.value);
+                            setScheduledAt(`${scheduleDate}T${e.target.value}`);
+                          }}
+                          className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold bg-white text-slate-900 focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Formatted Schedule Confirmation Badge */}
+                    <div className="p-2.5 rounded-xl bg-white border border-indigo-100 text-xs font-semibold text-indigo-900 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                      <span>
+                        নির্ধারিত সময়: <strong>{scheduleDate === getTodayDateStr() ? 'আজকে' : scheduleDate === getTomorrowDateStr() ? 'আগামী কালকে' : scheduleDate}</strong>, সময় <strong>{scheduleTime}</strong> টায় অটোমেটিক পোস্ট হবে।
+                      </span>
+                    </div>
                   </div>
                 )}
+
 
                 <button
                   type="submit"
