@@ -149,7 +149,7 @@ export default function AccountsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Connected Accounts & Channels</h1>
           <p className="text-sm text-slate-500 mt-1">
-            ফেসবুক, ইনস্টাগ্রাম এবং লিঙ্কডইন পেজ বা পার্সোনাল প্রোফাইল খুব সহজেই কানেক্ট করুন।
+            Easily connect Facebook, Instagram, LinkedIn pages, personal profiles, and WordPress sites.
           </p>
         </div>
 
@@ -160,7 +160,7 @@ export default function AccountsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition shadow-2xs cursor-pointer"
         >
           <BookOpen className="w-4 h-4 text-indigo-600" />
-          <span>কানেক্ট করার গাইড দেখুন (How to Connect)</span>
+          <span>Connection Guide (How to Connect)</span>
         </button>
       </div>
 
@@ -188,7 +188,7 @@ export default function AccountsPage() {
           {/* Simple Platform Switcher (No messy sub-tabs) */}
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              প্ল্যাটফর্ম নির্বাচন করুন
+              Select Platform
             </label>
             <div className="flex p-1 bg-slate-100 rounded-xl">
               <button
@@ -248,7 +248,7 @@ export default function AccountsPage() {
               onClick={() => openGuide(platform)}
               className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-semibold hover:underline cursor-pointer"
             >
-              <HelpCircle className="w-3.5 h-3.5" /> কিভাবে নিবেন?
+              <HelpCircle className="w-3.5 h-3.5" /> Need help?
             </button>
           </div>
 
@@ -260,10 +260,10 @@ export default function AccountsPage() {
                 {platform === 'WORDPRESS'
                   ? 'WordPress Site URL'
                   : platform === 'LINKEDIN'
-                  ? 'LinkedIn Member URN বা Org ID'
+                  ? 'LinkedIn Member URN or Org ID'
                   : platform === 'INSTAGRAM'
-                  ? 'Instagram Business বা Creator ID'
-                  : 'Facebook Page ID বা User ID'}
+                  ? 'Instagram Business or Creator ID'
+                  : 'Facebook Page ID or User ID'}
               </label>
               <input
                 type="text"
@@ -274,21 +274,21 @@ export default function AccountsPage() {
                   platform === 'WORDPRESS'
                     ? 'https://yourwebsite.com'
                     : platform === 'LINKEDIN'
-                    ? 'urn:li:person:... অথবা urn:li:organization:... (বা me)'
+                    ? 'urn:li:person:... or urn:li:organization:... (or "me")'
                     : platform === 'INSTAGRAM'
                     ? 'e.g. 17841405309214589'
-                    : 'e.g. 102938475610293 (পেজ আইডি) বা me'
+                    : 'e.g. 102938475610293 or "me"'
                 }
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition font-mono text-xs text-slate-900 bg-white"
               />
               <p className="text-[11px] text-slate-400 mt-1">
                 {platform === 'WORDPRESS'
-                  ? 'আপনার ওয়ার্ডপ্রেস ওয়েবসাইটের পূর্ণ লিংক দিন (যেমন: https://yourwebsite.com)'
+                  ? 'Enter full URL of your WordPress website (e.g. https://yourwebsite.com)'
                   : platform === 'LINKEDIN'
-                  ? 'কোম্পানি পেজ কানেক্ট করতে পেজের আইডি সংখ্যা (যেমন: 12345678) অথবা লিঙ্ক দিন। ব্যক্তিগত প্রোফাইলের জন্য me লিখুন।'
+                  ? 'For company pages, enter company page numerical ID or URL. For personal profile, write "me".'
                   : platform === 'INSTAGRAM'
-                  ? 'আপনার Instagram Business বা Creator অ্যাকাউন্টের আইডি'
-                  : 'ফেসবুক পেজ আইডি অথবা ব্যক্তিগত অ্যাকাউন্টের জন্য সরাসরি me লিখুন'}
+                  ? 'Your Instagram Business or Creator account ID'
+                  : 'Facebook Page ID, or enter "me" for personal user account'}
               </p>
             </div>
 
@@ -304,7 +304,7 @@ export default function AccountsPage() {
                   required
                   value={wpUsername}
                   onChange={(e) => setWpUsername(e.target.value)}
-                  placeholder="admin বা আপনার ওয়ার্ডপ্রেস ইউজারনেম"
+                  placeholder="admin or your WordPress username"
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#21759B] focus:border-[#21759B] transition font-mono text-xs text-slate-900 bg-white"
                 />
               </div>
@@ -328,13 +328,13 @@ export default function AccountsPage() {
                     ? 'AQ... (LinkedIn OAuth 2.0 Access Token)'
                     : platform === 'INSTAGRAM'
                     ? 'EAAG... (Meta Graph API Access Token)'
-                    : 'EAAG... (Facebook Page বা User Access Token)'
+                    : 'EAAG... (Facebook Page or User Access Token)'
                 }
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition font-mono text-xs text-slate-900 bg-white leading-relaxed"
               />
               {platform === 'WORDPRESS' && (
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Users &gt; Profile &gt; Application Passwords থেকে তৈরি করা পাসওয়ার্ডটি এখানে পেস্ট করুন।
+                  Paste the password generated from WordPress: Users &gt; Profile &gt; Application Passwords.
                 </p>
               )}
             </div>
@@ -370,7 +370,7 @@ export default function AccountsPage() {
               className="w-full py-2.5 px-3 rounded-xl border border-dashed border-indigo-200 text-xs text-indigo-700 font-semibold hover:bg-indigo-50/60 flex items-center justify-center gap-1.5 transition cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-              এক ক্লিকে টেস্ট ডেমো অ্যাকাউন্ট বসান (Instant Test)
+              Fill Demo Test Credentials (Instant Test)
             </button>
           </form>
         </div>
@@ -381,7 +381,7 @@ export default function AccountsPage() {
             <h2 className="font-bold text-base text-slate-900">
               Active Connected Channels ({accounts.length})
             </h2>
-            <span className="text-xs text-slate-400">পোস্ট করার জন্য সক্রিয় চ্যানেল</span>
+            <span className="text-xs text-slate-400">Channels active for posting</span>
           </div>
 
           {loading ? (
@@ -393,9 +393,9 @@ export default function AccountsPage() {
               <div className="h-12 w-12 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
                 <Share2 className="w-6 h-6" />
               </div>
-              <p className="text-sm font-semibold text-slate-800">কোনো সোশ্যাল চ্যানেল কানেক্ট করা নেই</p>
+              <p className="text-sm font-semibold text-slate-800">No social channels connected yet</p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                বামপাশের ফর্ম দিয়ে ফেসবুক, ইনস্টাগ্রাম বা লিঙ্কডইন অ্যাকাউন্ট কানেক্ট করুন অথবা টেস্ট বাটন চাপুন।
+                Use the form on the left to connect Facebook, Instagram, LinkedIn, or WordPress.
               </p>
             </div>
           ) : (
@@ -474,10 +474,10 @@ export default function AccountsPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    সোশ্যাল অ্যাকাউন্ট API কানেক্ট করার সহজ গাইড
+                    Step-by-Step API Connection Guide
                   </h3>
                   <p className="text-xs text-slate-500">
-                    কিভাবে আইডি এবং অ্যাক্সেস টোকেন পাবেন তা নিচে ধাপে ধাপে বুঝিয়ে দেওয়া হয়েছে।
+                    Follow the instructions below to obtain your ID and Access Token for each platform.
                   </p>
                 </div>
               </div>
@@ -502,7 +502,7 @@ export default function AccountsPage() {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Share2 className="w-3.5 h-3.5" /> Facebook গাইড
+                <Share2 className="w-3.5 h-3.5" /> Facebook Guide
               </button>
               <button
                 type="button"
@@ -513,7 +513,7 @@ export default function AccountsPage() {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Instagram className="w-3.5 h-3.5" /> Instagram গাইড
+                <Instagram className="w-3.5 h-3.5" /> Instagram Guide
               </button>
               <button
                 type="button"
@@ -524,7 +524,7 @@ export default function AccountsPage() {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Linkedin className="w-3.5 h-3.5" /> LinkedIn গাইড
+                <Linkedin className="w-3.5 h-3.5" /> LinkedIn Guide
               </button>
               <button
                 type="button"
@@ -535,7 +535,7 @@ export default function AccountsPage() {
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Globe className="w-3.5 h-3.5" /> WordPress গাইড
+                <Globe className="w-3.5 h-3.5" /> WordPress Guide
               </button>
             </div>
 
@@ -546,9 +546,9 @@ export default function AccountsPage() {
                   {/* Step 1: Tool link */}
                   <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-blue-950 text-sm">১. Meta Graph API Explorer ওপেন করুন</p>
+                      <p className="font-bold text-blue-950 text-sm">1. Open Meta Graph API Explorer</p>
                       <p className="text-blue-800 text-xs mt-0.5">
-                        মেটার অফিসিয়াল টুল থেকে কয়েক ক্লিকেই টোকেন ও আইডি পাওয়া যায়।
+                        Get your tokens and IDs directly from Meta official developer tool in a few clicks.
                       </p>
                     </div>
                     <a
@@ -557,7 +557,7 @@ export default function AccountsPage() {
                       rel="noreferrer"
                       className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1 text-xs flex-shrink-0 shadow-2xs"
                     >
-                      Explorer লিংক <ExternalLink className="w-3 h-3" />
+                      Explorer Tool <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
 
@@ -565,13 +565,13 @@ export default function AccountsPage() {
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      ফেসবুক পেজ (Facebook Page) কানেক্ট করার নিয়ম:
+                      How to connect a Facebook Page:
                     </p>
                     <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
-                      <li>Graph API Explorer-এ যান এবং ডানপাশে <strong>User or Page</strong> ড্রপডাউন থেকে আপনার <strong>Facebook Page</strong> টি নির্বাচন করুন।</li>
-                      <li><strong>Add Permission</strong> থেকে <code className="px-1.5 py-0.5 bg-slate-100 text-indigo-600 rounded font-mono">pages_manage_posts</code> এবং <code className="px-1.5 py-0.5 bg-slate-100 text-indigo-600 rounded font-mono">pages_read_engagement</code> পারমিশন যুক্ত করুন।</li>
-                      <li><strong>Generate Access Token</strong> বাটনে ক্লিক করে ফেসবুক লগইন করে পারমিশন অ্যাপ্রুভ করুন।</li>
-                      <li>স্ক্রিনে যে <strong>Access Token</strong> আসবে তা কপি করে টোকেন বক্সে দিন এবং আপনার পেজ আইডিটি আইডি বক্সে বসিয়ে Connect চাপুন।</li>
+                      <li>Visit the Graph API Explorer and select your <strong>Facebook Page</strong> from the <strong>User or Page</strong> dropdown.</li>
+                      <li>In <strong>Add Permission</strong>, add <code className="px-1.5 py-0.5 bg-slate-100 text-indigo-600 rounded font-mono">pages_manage_posts</code> and <code className="px-1.5 py-0.5 bg-slate-100 text-indigo-600 rounded font-mono">pages_read_engagement</code> permissions.</li>
+                      <li>Click <strong>Generate Access Token</strong> and approve the Facebook login prompt.</li>
+                      <li>Copy the generated <strong>Access Token</strong> into the token box, put your Page ID in the ID box, and click Connect.</li>
                     </ol>
                   </div>
 
@@ -579,10 +579,10 @@ export default function AccountsPage() {
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-purple-600"></span>
-                      ব্যক্তিগত ফেসবুক প্রোফাইল (Personal Profile) কানেক্ট করার নিয়ম:
+                      How to connect a personal Facebook profile:
                     </p>
                     <p className="text-slate-600">
-                      Explorer-এ User Token নির্বাচন করুন। আইডি বক্সে সরাসরি <code className="px-1.5 py-0.5 bg-purple-50 text-purple-700 font-bold rounded">me</code> অথবা আপনার প্রোফাইল আইডি দিন এবং জেনারেট করা User Access Token কপি করে বসিয়ে দিন।
+                      In the Explorer, select User Token. In the ID box, simply enter <code className="px-1.5 py-0.5 bg-purple-50 text-purple-700 font-bold rounded">me</code> or your user ID, and paste the generated User Access Token.
                     </p>
                   </div>
                 </div>
@@ -592,9 +592,9 @@ export default function AccountsPage() {
                 <div className="space-y-4">
                   <div className="p-3.5 rounded-2xl bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100 flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-pink-950 text-sm">ইনস্টাগ্রাম কানেক্ট করার প্রাথমিক শর্ত</p>
+                      <p className="font-bold text-pink-950 text-sm">Instagram Prerequisite Requirements</p>
                       <p className="text-pink-800 text-xs mt-0.5">
-                        অ্যাকাউন্টটি <strong>Professional (Business বা Creator)</strong> অ্যাকাউন্ট হতে হবে এবং একটি ফেসবুক পেজের সাথে লিংক করা থাকতে হবে।
+                        Your account must be a <strong>Professional (Business or Creator)</strong> account and linked to a Facebook Page.
                       </p>
                     </div>
                     <a
@@ -608,13 +608,13 @@ export default function AccountsPage() {
                   </div>
 
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
-                    <p className="font-bold text-slate-900 text-xs">ধাপে ধাপে ইনস্টাগ্রাম কানেক্ট করার পদ্ধতি:</p>
+                    <p className="font-bold text-slate-900 text-xs">Step-by-step Instagram connection procedure:</p>
                     <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
-                      <li>আপনার ইনস্টাগ্রাম অ্যাকাউন্টকে মোবাইল অ্যাপ থেকে Professional Account-এ সুইচ করুন (Settings &gt; Account &gt; Switch to Professional)।</li>
-                      <li>ফেসবুক পেজ সেটিংসে গিয়ে ইনস্টাগ্রাম অ্যাকাউন্টটি পেজের সাথে লিংক করুন।</li>
-                      <li><a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-pink-600 font-semibold underline">Meta Graph API Explorer</a>-এ যান।</li>
-                      <li>পারমিশন হিসেবে <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_basic</code> এবং <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_content_publish</code> যোগ করুন।</li>
-                      <li>টোকেন জেনারেট করে আপনার Instagram Account ID এবং Access Token বক্সে পেস্ট করে Connect বাটনে ক্লিক করুন।</li>
+                      <li>Convert your Instagram account to a Professional Account using the mobile app (Settings &gt; Account &gt; Switch to Professional).</li>
+                      <li>In your Facebook Page settings, link your Instagram account to the Facebook Page.</li>
+                      <li>Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-pink-600 font-semibold underline">Meta Graph API Explorer</a>.</li>
+                      <li>Add permissions <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_basic</code> and <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_content_publish</code>.</li>
+                      <li>Generate the access token, paste your Instagram Account ID and Access Token in the form, and click Connect.</li>
                     </ol>
                   </div>
                 </div>
@@ -626,7 +626,7 @@ export default function AccountsPage() {
                     <div>
                       <p className="font-bold text-blue-950 text-sm">LinkedIn Developer Portal</p>
                       <p className="text-blue-800 text-xs mt-0.5">
-                        লিঙ্কডইনের পার্সোনাল প্রোফাইল বা কোম্পানি পেজের টোকেন নেওয়ার লিঙ্ক।
+                        Direct link to generate access tokens for personal profiles or company pages.
                       </p>
                     </div>
                     <a
@@ -642,24 +642,24 @@ export default function AccountsPage() {
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
-                      ১. ব্যক্তিগত প্রোফাইল (Personal Profile):
+                      1. Personal Profile:
                     </p>
                     <p className="text-slate-600 pl-3.5">
-                      ব্যক্তিগত প্রোফাইলের জন্য কোনো কঠিন আইডি লাগবে না—আইডির ঘরে শুধু <code className="px-1.5 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">me</code> লিখুন এবং আপনার জেনারেট করা Access Token দিয়ে কানেক্ট চাপুন।
+                      No numeric ID needed for personal profiles—simply type <code className="px-1.5 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">me</code> into the ID box and connect with your generated Access Token.
                     </p>
 
                     <div className="pt-2 border-t border-slate-100"></div>
 
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
-                      ২. কোম্পানি পেজ আইডি (Company Page ID) কোথায় পাবেন:
+                      2. How to find your Company Page ID:
                     </p>
                     <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
-                      <li>লিঙ্কডইনে লগইন করে আপনার কোম্পানি পেজের <strong>Admin View</strong>-তে যান।</li>
-                      <li>ব্রাউজারের অ্যাড্রেস বারের লিঙ্কটি খেয়াল করুন: <code className="px-1 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">linkedin.com/company/<strong>12345678</strong>/admin/...</code></li>
-                      <li>এখানে <code className="px-1 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">/company/</code> এর ঠিক পরের <strong>সংখ্যাটি (যেমন: 12345678)</strong> হলো আপনার পেজ আইডি!</li>
-                      <li>আপনি সরাসরি এই সংখ্যাটি অথবা পুরো পেজের লিঙ্কটি আমাদের আইডি ঘরে পেস্ট করতে পারেন (সিস্টেম অটোমেটিক আইডি চিনে নিবে)।</li>
-                      <li>টোকেন নেওয়ার সময় <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_organization_social</code> পারমিশন সিলেক্ট করে টোকেন নিন।</li>
+                      <li>Log in to LinkedIn and navigate to your company page <strong>Admin View</strong>.</li>
+                      <li>Check the browser address bar: <code className="px-1 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">linkedin.com/company/<strong>12345678</strong>/admin/...</code></li>
+                      <li>The number right after <code className="px-1 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">/company/</code> (e.g. <strong>12345678</strong>) is your Page ID!</li>
+                      <li>You can enter this number directly or paste the whole URL in the ID box (the system automatically extracts the ID).</li>
+                      <li>When generating the token, ensure you include the <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_organization_social</code> permission.</li>
                     </ol>
                   </div>
                 </div>
@@ -669,9 +669,9 @@ export default function AccountsPage() {
                 <div className="space-y-4">
                   <div className="p-3.5 rounded-2xl bg-[#21759B]/10 border border-[#21759B]/20 flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-[#1a5d7c] text-sm">ওয়ার্ডপ্রেস Application Passwords ফিচার</p>
+                      <p className="font-bold text-[#1a5d7c] text-sm">WordPress Application Passwords</p>
                       <p className="text-[#21759B] text-xs mt-0.5">
-                        ওয়ার্ডপ্রেস ৫.৬+ এর সব ভার্সনে কোনো বাড়তি প্লাগইন ছাড়াই সিকিউর অ্যাপ্লিকেশন পাসওয়ার্ড তৈরি করা যায়।
+                        Built natively into WordPress 5.6+. No extra plugins required for secure publishing.
                       </p>
                     </div>
                   </div>
@@ -679,16 +679,16 @@ export default function AccountsPage() {
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-[#21759B]"></span>
-                      ধাপে ধাপে ওয়ার্ডপ্রেস কানেক্ট করার নিয়ম:
+                      Step-by-step WordPress connection:
                     </p>
                     <ol className="list-decimal pl-5 space-y-2 text-slate-600 text-xs">
-                      <li>আপনার ওয়ার্ডপ্রেস অ্যাডমিন ড্যাশবোর্ডে লগইন করুন (যেমন: <code className="px-1 py-0.5 bg-slate-100 rounded">https://yourwebsite.com/wp-admin</code>)।</li>
-                      <li>বামপাশের ড্যাশবোর্ড মেনু থেকে <strong>Users (ব্যবহারকারী) &gt; Profile (প্রোফাইল)</strong> এ যান।</li>
-                      <li>পেজের একদম নিচে স্ক্রোল করে <strong>Application Passwords</strong> সেকশনে আসুন।</li>
-                      <li><strong>New Application Password Name</strong> ঘরে লিখুন: <code className="px-1.5 py-0.5 bg-cyan-50 text-[#21759B] font-bold rounded">PostCraft</code>।</li>
-                      <li><strong>Add New Application Password</strong> বাটনে ক্লিক করুন।</li>
-                      <li>স্ক্রিনে যে ২৪ অক্ষরের পাসওয়ার্ডটি আসবে (যেমন: <code className="px-1 py-0.5 bg-slate-100 font-mono">abcd efgh ijkl mnop</code>) সেটি কপি করুন।</li>
-                      <li>পোস্টক্রাফটে এসে আপনার <strong>Site URL</strong>, <strong>Username</strong>, এবং এই <strong>Application Password</strong> দিয়ে Connect বাটনে ক্লিক করুন!</li>
+                      <li>Log in to your WordPress admin dashboard (e.g. <code className="px-1 py-0.5 bg-slate-100 rounded">https://yourwebsite.com/wp-admin</code>).</li>
+                      <li>From the left sidebar, navigate to <strong>Users &gt; Profile</strong>.</li>
+                      <li>Scroll down to the <strong>Application Passwords</strong> section.</li>
+                      <li>In <strong>New Application Password Name</strong>, type: <code className="px-1.5 py-0.5 bg-cyan-50 text-[#21759B] font-bold rounded">PostCraft</code>.</li>
+                      <li>Click <strong>Add New Application Password</strong>.</li>
+                      <li>Copy the 24-character generated password (e.g. <code className="px-1 py-0.5 bg-slate-100 font-mono">abcd efgh ijkl mnop</code>).</li>
+                      <li>Return to PostCraft, enter your <strong>Site URL</strong>, <strong>Username</strong>, and paste the <strong>Application Password</strong>, then click Connect!</li>
                     </ol>
                   </div>
                 </div>
@@ -699,7 +699,7 @@ export default function AccountsPage() {
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-indigo-600 shrink-0" />
                   <span>
-                    অ্যাপ তৈরির সময় <strong>Privacy Policy URL</strong> চাইলে দিন:{' '}
+                    When creating your Meta/LinkedIn app, use this <strong>Privacy Policy URL</strong>:{' '}
                     <code className="bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono font-bold">
                       /privacy
                     </code>
@@ -711,7 +711,7 @@ export default function AccountsPage() {
                   rel="noreferrer"
                   className="shrink-0 text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1"
                 >
-                  পলিসি পেজ দেখুন <ExternalLink className="w-3 h-3" />
+                  View Policy Page <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
             </div>
@@ -723,7 +723,7 @@ export default function AccountsPage() {
                 onClick={() => setIsGuideOpen(false)}
                 className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
               >
-                বুঝেছি, বন্ধ করুন (Got it)
+                Got it, Close
               </button>
             </div>
           </div>

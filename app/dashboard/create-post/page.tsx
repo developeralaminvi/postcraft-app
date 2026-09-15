@@ -1209,12 +1209,16 @@ export default function CreatePostPage() {
 
     const paramDate = searchParams.get('scheduledAt');
     if (paramDate) {
-      setPublishMode('schedule');
-      setScheduledAt(paramDate);
-      if (paramDate.includes('T')) {
-        const [d, t] = paramDate.split('T');
-        setScheduleDate(d);
-        setScheduleTime(t.slice(0, 5));
+      const parsedDate = new Date(paramDate);
+      const isPast = !isNaN(parsedDate.getTime()) && parsedDate.getTime() < Date.now() - 60000;
+      if (!isPast) {
+        setPublishMode('schedule');
+        setScheduledAt(paramDate);
+        if (paramDate.includes('T')) {
+          const [d, t] = paramDate.split('T');
+          setScheduleDate(d);
+          setScheduleTime(t.slice(0, 5));
+        }
       }
     } else {
       const d = new Date(Date.now() + 60 * 60 * 1000);
@@ -1368,19 +1372,27 @@ export default function CreatePostPage() {
     if (targetAccountIds.length === 0) {
       setError(
         isWpMode
-          ? 'কোনো ওয়ার্ডপ্রেস অ্যাকাউন্ট যুক্ত নেই। অনুগ্রহ করে Accounts মেনু থেকে সাইট কানেক্ট করুন।'
+          ? 'No WordPress account connected. Please connect your site from the Accounts menu.'
           : 'Please select at least one social channel to publish to.'
       );
       return;
     }
 
+    if (publishMode === 'schedule') {
+      const scheduleDateTime = new Date(scheduledAt);
+      if (isNaN(scheduleDateTime.getTime()) || scheduleDateTime.getTime() < Date.now() - 60000) {
+        setError('Scheduled date and time cannot be in the past. Please select a present or future time.');
+        return;
+      }
+    }
+
     if (isWpMode) {
       if (!currentTitle || !currentTitle.trim()) {
-        setError('ওয়ার্ডপ্রেস পোস্টের জন্য আর্টিকেলের শিরোনাম (Article Title) আবশ্যক।');
+        setError('Article Title is required for WordPress posts.');
         return;
       }
       if (!currentContent || !currentContent.trim()) {
-        setError('ওয়ার্ডপ্রেস পোস্টের জন্য আর্টিকেলের মূল কন্টেন্ট (Article Body) আবশ্যক।');
+        setError('Article Body content is required for WordPress posts.');
         return;
       }
     } else {
@@ -1476,8 +1488,8 @@ export default function CreatePostPage() {
       setSuccess(
         isWpMode
           ? publishMode === 'now'
-            ? 'ওয়ার্ডপ্রেসে পোস্ট সফলভাবে প্রকাশিত হয়েছে!'
-            : 'ওয়ার্ডপ্রেস পোস্ট সফলভাবে ক্যালেন্ডারে শিডিউল হয়েছে!'
+            ? 'WordPress post published successfully!'
+            : 'WordPress post scheduled successfully on calendar!'
           : publishMode === 'now'
           ? `Successfully published to ${targetAccountIds.length} channel${targetAccountIds.length > 1 ? 's' : ''}!`
           : `Post scheduled across ${targetAccountIds.length} channel${targetAccountIds.length > 1 ? 's' : ''} successfully!`
@@ -1547,7 +1559,7 @@ export default function CreatePostPage() {
             }`}
           >
             <Share2 className="w-4 h-4" />
-            <span>সোশ্যাল মিডিয়া পোস্ট (Social Media)</span>
+            <span>Social Media Post</span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                 composerMode === 'SOCIAL' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-600'
@@ -1567,13 +1579,13 @@ export default function CreatePostPage() {
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>ওয়ার্ডপ্রেস আর্টিকেল (WordPress Blog Article)</span>
+            <span>WordPress Blog Article</span>
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
                 composerMode === 'WORDPRESS' ? 'bg-[#1a5f7e] text-white' : 'bg-slate-200 text-slate-600'
               }`}
             >
-              H1, H2, ক্যাটাগরি, ফিচারড ইমেজ
+              H1, H2, Categories, Featured Image
             </span>
           </button>
         </div>
@@ -1581,7 +1593,7 @@ export default function CreatePostPage() {
         {composerMode === 'WORDPRESS' && wpAccounts.length > 0 && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-[#21759B] font-semibold">
             <Globe className="w-3.5 h-3.5" />
-            <span>সাইট: {wpAccounts[0].name} ({wpAccounts[0].pageId || wpAccounts[0].accountId})</span>
+            <span>Connected Site: {wpAccounts[0].name} ({wpAccounts[0].pageId || wpAccounts[0].accountId})</span>
           </div>
         )}
       </div>
@@ -1690,7 +1702,7 @@ export default function CreatePostPage() {
                           {acc.name}
                         </p>
                         <p className={`text-[10px] capitalize truncate ${isSelected ? 'text-slate-600 font-semibold' : 'text-slate-400'}`}>
-                          {isSelected ? '✓ সিলেক্টেড' : 'ক্লিক করে যুক্ত করুন'} • {acc.platform.toLowerCase()}
+                          {isSelected ? '✓ Selected' : 'Click to add'} • {acc.platform.toLowerCase()}
                         </p>
                       </div>
                     </button>
@@ -1712,7 +1724,7 @@ export default function CreatePostPage() {
               }`}
             >
               <Globe className="w-3.5 h-3.5" />
-              <span>একসাথে সব চ্যানেলে (Master)</span>
+              <span>All Channels (Master)</span>
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                   isMaster ? 'bg-indigo-700/80 text-white' : 'bg-slate-100 text-slate-600'
@@ -1754,18 +1766,18 @@ export default function CreatePostPage() {
                         className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${
                           isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900'
                         }`}
-                        title="আলাদা কাস্টম এডিট করা হচ্ছে"
+                        title="Customized for this channel"
                       >
-                        🔓 কাস্টম
+                        🔓 Custom
                       </span>
                     ) : (
                       <span
                         className={`text-[9px] px-1 py-0.5 rounded-md flex items-center gap-0.5 ${
                           isActive ? 'text-slate-300' : 'text-slate-400'
                         }`}
-                        title="মাস্টার পোস্টের সাথে লক করা"
+                        title="Synced with Master Post"
                       >
-                        <Lock className="w-2.5 h-2.5" /> লকড
+                        <Lock className="w-2.5 h-2.5" /> Synced
                       </span>
                     )}
                   </button>
@@ -1832,7 +1844,7 @@ export default function CreatePostPage() {
               <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-[#21759B]" /> আর্টিকেল শিরোনাম / Title (H1) <span className="text-rose-500">*</span>
+                    <FileText className="w-4 h-4 text-[#21759B]" /> Article Title (H1) <span className="text-rose-500">*</span>
                   </label>
                   <span className="text-[11px] font-semibold text-[#21759B] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
                     WordPress H1 Heading
@@ -1843,20 +1855,20 @@ export default function CreatePostPage() {
                   required
                   value={currentTitle}
                   onChange={(e) => updateActiveTitle(e.target.value)}
-                  placeholder="যেমন: ১০টি সেরা ওয়ার্ডপ্রেস এসইও প্লাগইন যা আপনার সাইটের ট্রাফিক বাড়াবে..."
+                  placeholder="e.g. 10 Best WordPress SEO Plugins to Boost Your Website Traffic..."
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-[#21759B] text-base font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-100 transition placeholder:font-normal placeholder:text-slate-400"
                 />
               </div>
 
-              {/* 2. Featured Image Box (ফিচারড ইমেজ আপলোড করা) */}
+              {/* 2. Featured Image Box */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <ImageIcon className="w-4 h-4 text-[#21759B]" /> ফিচারড ইমেজ আপলোড করুন (Featured Image)
+                      <ImageIcon className="w-4 h-4 text-[#21759B]" /> Upload Featured Image
                     </label>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      ব্লগ পোস্টের মূল কভার ছবি যা আর্টিকেলের শীর্ষে এবং সোশ্যাল শেয়ারে দেখাবে
+                      Main cover image displayed at the top of the article and when shared on social media
                     </p>
                   </div>
                   {currentMediaUrl && (
@@ -1899,10 +1911,10 @@ export default function CreatePostPage() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-slate-800">
-                        {uploadingMedia ? 'ছবি আপলোড হচ্ছে...' : 'ক্লিক করে ফিচারড ইমেজ আপলোড করুন'}
+                        {uploadingMedia ? 'Uploading image...' : 'Click or drop to upload Featured Image'}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
-                        JPG, PNG, WEBP ফরম্যাট সাপোর্ট করে
+                        Supports JPG, PNG, WEBP formats
                       </p>
                     </div>
                   </div>
@@ -1913,7 +1925,7 @@ export default function CreatePostPage() {
                       type="button"
                       onClick={removeActiveMedia}
                       className="absolute top-3 right-3 p-2 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-white transition shadow-md cursor-pointer"
-                      title="ছবি মুছে ফেলুন"
+                      title="Remove image"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -1924,21 +1936,21 @@ export default function CreatePostPage() {
                 )}
               </div>
 
-              {/* 3. Categories Selection Box (ক্যাটাগরি সিলেক্ট করা) */}
+              {/* 3. Categories Selection Box */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                   <div>
                     <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Tag className="w-4 h-4 text-[#21759B]" /> ক্যাটাগরি সিলেক্ট করুন (WordPress Categories)
+                      <Tag className="w-4 h-4 text-[#21759B]" /> Select Categories (WordPress Categories)
                     </label>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      সংযুক্ত ওয়ার্ডপ্রেস সাইট থেকে সরাসরি ক্যাটাগরি আনা হয়েছে
+                      Fetched live directly from your connected WordPress site
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 font-medium">
-                      {currentCategories.length} টি নির্বাচিত
+                      {currentCategories.length} selected
                     </span>
                     <button
                       type="button"
@@ -1948,10 +1960,10 @@ export default function CreatePostPage() {
                       }}
                       disabled={loadingWpCategories}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-blue-50 text-[#21759B] text-[11px] font-semibold transition cursor-pointer"
-                      title="ক্যাটাগরি রিলোড করুন"
+                      title="Reload Categories"
                     >
                       <RefreshCw className={`w-3 h-3 ${loadingWpCategories ? 'animate-spin' : ''}`} />
-                      <span>রিফ্রেশ</span>
+                      <span>Refresh</span>
                     </button>
                   </div>
                 </div>
@@ -1964,7 +1976,7 @@ export default function CreatePostPage() {
                       type="text"
                       value={categorySearch}
                       onChange={(e) => setCategorySearch(e.target.value)}
-                      placeholder="ক্যাটাগরি সার্চ করুন..."
+                      placeholder="Search categories..."
                       className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#21759B] bg-slate-50/50"
                     />
                   </div>
@@ -1972,7 +1984,7 @@ export default function CreatePostPage() {
 
                 {loadingWpCategories ? (
                   <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 flex items-center justify-center gap-2 text-xs text-[#21759B] font-semibold">
-                    <Loader2 className="w-4 h-4 animate-spin" /> ওয়ার্ডপ্রেস থেকে ক্যাটাগরি লোড হচ্ছে...
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading categories from WordPress...
                   </div>
                 ) : wpCategories.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
@@ -2021,7 +2033,7 @@ export default function CreatePostPage() {
                   </div>
                 ) : (
                   <p className="text-xs text-slate-400 italic">
-                    ডিফল্ট ক্যাটাগরি (Uncategorized) ব্যবহার করা হবে।
+                    Default category (Uncategorized) will be used.
                   </p>
                 )}
               </div>
@@ -2030,7 +2042,7 @@ export default function CreatePostPage() {
               <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <FileCode className="w-4 h-4 text-[#21759B]" /> আর্টিকেল বডি ও ফরম্যাটিং (Article Body) <span className="text-rose-500">*</span>
+                    <FileCode className="w-4 h-4 text-[#21759B]" /> Article Body & Formatting <span className="text-rose-500">*</span>
                   </label>
                   <span className="text-xs text-slate-400">{currentContent.length} characters</span>
                 </div>
@@ -2122,7 +2134,7 @@ export default function CreatePostPage() {
                         disabled={uploadingInline}
                         onClick={() => inlineImageInputRef.current?.click()}
                         className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#21759B] hover:bg-[#1a5f7e] text-white font-semibold transition text-[11px] cursor-pointer shadow-xs disabled:opacity-50"
-                        title="কন্টেন্টের ভেতরে ছবি যুক্ত করুন"
+                        title="Insert inline image in content"
                       >
                         {uploadingInline ? (
                           <>
@@ -2174,7 +2186,7 @@ export default function CreatePostPage() {
                       dangerouslySetInnerHTML={{
                         __html:
                           currentContent ||
-                          '<p class="text-slate-400 italic">এখানে আপনার আর্টিকেলের ভিজ্যুয়াল প্রিভিউ দেখাবে। কন্টেন্ট লিখতে উপরের "HTML Code" ট্যাবে যান।</p>',
+                          '<p class="text-slate-400 italic">Visual preview of your article will appear here. Switch to "HTML Code" to edit content.</p>',
                       }}
                     />
                   </div>
@@ -2185,7 +2197,7 @@ export default function CreatePostPage() {
                     rows={10}
                     value={currentContent}
                     onChange={(e) => updateActiveContent(e.target.value)}
-                    placeholder="এখানে আপনার ব্লগের আর্টিকেল লিখুন। উপরের টুলবার দিয়ে <h1>, <h2>, <h3>, <strong>, <a> ট্যাগ এবং ইনলাইন ছবি যুক্ত করতে পারবেন..."
+                    placeholder="Write your WordPress blog article here. Use the toolbar above for <h1>, <h2>, <h3>, <strong>, <a> tags and inline images..."
                     className="w-full p-4 rounded-xl border border-slate-300 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#21759B] transition leading-relaxed text-slate-900"
                   />
                 )}
@@ -2194,7 +2206,7 @@ export default function CreatePostPage() {
               {/* 5. WordPress Post Visibility & Status */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
                 <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-[#21759B]" /> পোস্টের দৃশ্যমানতা ও স্ট্যাটাস (Status & Visibility)
+                  <Globe className="w-4 h-4 text-[#21759B]" /> Status & Visibility
                 </label>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -2217,8 +2229,8 @@ export default function CreatePostPage() {
                           <Globe className="w-4 h-4" />
                         </span>
                         <div>
-                          <p className="font-bold text-xs text-slate-900">Public (পাবলিক)</p>
-                          <span className="text-[10px] text-emerald-700 font-semibold">সবার জন্য লাইভ</span>
+                          <p className="font-bold text-xs text-slate-900">Public</p>
+                          <span className="text-[10px] text-emerald-700 font-semibold">Live for Everyone</span>
                         </div>
                       </div>
                       <input
@@ -2230,8 +2242,8 @@ export default function CreatePostPage() {
                     </div>
                     <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
                       {publishMode === 'schedule'
-                        ? 'নির্ধারিত শিডিউল টাইমে সরাসরি সবার জন্য লাইভ হয়ে যাবে।'
-                        : 'পোস্ট করার সাথে সাথে ওয়েবসাইটে সবার জন্য লাইভ দেখা যাবে।'}
+                        ? 'Will automatically go live for all website visitors at the scheduled time.'
+                        : 'Instantly published and live for everyone on your website.'}
                     </p>
                   </div>
 
@@ -2254,8 +2266,8 @@ export default function CreatePostPage() {
                           <Lock className="w-4 h-4" />
                         </span>
                         <div>
-                          <p className="font-bold text-xs text-slate-900">Private (প্রাইভেট)</p>
-                          <span className="text-[10px] text-amber-700 font-semibold">গোপন পোস্ট</span>
+                          <p className="font-bold text-xs text-slate-900">Private</p>
+                          <span className="text-[10px] text-amber-700 font-semibold">Admins & Editors</span>
                         </div>
                       </div>
                       <input
@@ -2266,7 +2278,7 @@ export default function CreatePostPage() {
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                      শুধুমাত্র সাইটের অ্যাডমিন ও অথর দেখতে পারবেন। সাধারণ পাঠকরা দেখতে পাবে না।
+                      Only site administrators and authors can view this post. Hidden from regular visitors.
                     </p>
                   </div>
 
@@ -2289,8 +2301,8 @@ export default function CreatePostPage() {
                           <FileText className="w-4 h-4" />
                         </span>
                         <div>
-                          <p className="font-bold text-xs text-slate-900">Draft (ড্রাফট)</p>
-                          <span className="text-[10px] text-blue-700 font-semibold">খসড়া হিসেবে জমা</span>
+                          <p className="font-bold text-xs text-slate-900">Draft</p>
+                          <span className="text-[10px] text-blue-700 font-semibold">Save as Draft</span>
                         </div>
                       </div>
                       <input
@@ -2301,7 +2313,7 @@ export default function CreatePostPage() {
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                      ওয়ার্ডপ্রেস ব্যাকএন্ডে ড্রাফট হিসেবে জমা থাকবে। পরে এডিট বা প্রকাশ করা যাবে।
+                      Saved in WordPress backend as a draft for further editing before publishing.
                     </p>
                   </div>
 
@@ -2325,7 +2337,7 @@ export default function CreatePostPage() {
                         </span>
                         <div>
                           <p className="font-bold text-xs text-slate-900">Pending Review</p>
-                          <span className="text-[10px] text-purple-700 font-semibold">অনুমোদনের অপেক্ষায়</span>
+                          <span className="text-[10px] text-purple-700 font-semibold">Editorial Review</span>
                         </div>
                       </div>
                       <input
@@ -2336,7 +2348,7 @@ export default function CreatePostPage() {
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 mt-2 leading-relaxed">
-                      পর্যালোচনার জন্য জমা থাকবে। সিনিয়র এডিটর বা অ্যাডমিনের অনুমোদনের পর প্রকাশিত হবে।
+                      Submitted for review. A senior editor or admin will approve before publishing.
                     </p>
                   </div>
                 </div>
@@ -2347,30 +2359,30 @@ export default function CreatePostPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5 text-slate-400" /> Post Tags (ট্যাগ - কমা দিয়ে আলাদা করুন)
+                      <Tag className="w-3.5 h-3.5 text-slate-400" /> Post Tags (Comma separated)
                     </label>
                     <input
                       type="text"
                       value={currentTags}
                       onChange={(e) => updateActiveTags(e.target.value)}
-                      placeholder="যেমন: wordpress, technology, web dev"
+                      placeholder="e.g. wordpress, technology, web dev"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">ওয়ার্ডপ্রেসের ট্যাগে যুক্ত হবে</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Assigned to WordPress post tags</p>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                      <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Post Excerpt / সারসংক্ষেপ (ঐচ্ছিক)
+                      <Edit3 className="w-3.5 h-3.5 text-slate-400" /> Post Excerpt (Optional)
                     </label>
                     <input
                       type="text"
                       value={currentExcerpt}
                       onChange={(e) => updateActiveExcerpt(e.target.value)}
-                      placeholder="পোস্টের সংক্ষিপ্ত বিবরণ যা ব্লগ আর্কাইভে এবং গুগল সার্চে দেখাবে..."
+                      placeholder="Short summary of the post displayed in blog archives and search results..."
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-[#21759B] bg-white text-slate-900"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">এসইও মেটা ডেসক্রিপশনে ব্যবহৃত হবে</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Used in SEO meta descriptions and post summaries</p>
                   </div>
                 </div>
               </div>
@@ -2409,14 +2421,14 @@ export default function CreatePostPage() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-[#21759B]" /> কোন তারিখে পোস্ট হবে? (Select Date)
+                          <Calendar className="w-3.5 h-3.5 text-[#21759B]" /> Schedule Date
                         </label>
                         <span className="text-[11px] font-bold text-[#21759B] bg-white px-2 py-0.5 rounded-full border border-blue-200">
                           {scheduleDate === getTodayDateStr()
-                            ? '⚡ আজকে (Today)'
+                            ? '⚡ Today'
                             : scheduleDate === getTomorrowDateStr()
-                            ? '📅 কালকে (Tomorrow)'
-                            : `তারিখ: ${scheduleDate}`}
+                            ? '📅 Tomorrow'
+                            : `Date: ${scheduleDate}`}
                         </span>
                       </div>
 
@@ -2434,7 +2446,7 @@ export default function CreatePostPage() {
                               : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
-                          ⚡ আজকে (Today)
+                          ⚡ Today
                         </button>
 
                         <button
@@ -2450,7 +2462,7 @@ export default function CreatePostPage() {
                               : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
-                          📅 কালকে (Tomorrow)
+                          📅 Tomorrow
                         </button>
 
                         <div className="relative">
@@ -2476,19 +2488,19 @@ export default function CreatePostPage() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-[#21759B]" /> কয়টা বাজে পোস্ট হবে? (Select Time)
+                          <Clock className="w-3.5 h-3.5 text-[#21759B]" /> Schedule Time
                         </label>
                         <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                          সময়: {scheduleTime}
+                          Time: {scheduleTime}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2.5">
                         {[
-                          { label: 'সকাল ০৯:০০', time: '09:00', icon: '🌅' },
-                          { label: 'দুপুর ০১:০০', time: '13:00', icon: '☀️' },
-                          { label: 'সন্ধ্যা ০৬:০০', time: '18:00', icon: '🌆' },
-                          { label: 'রাত ০৮:৩০', time: '20:30', icon: '🌙' },
+                          { label: 'Morning 09:00', time: '09:00', icon: '🌅' },
+                          { label: 'Afternoon 13:00', time: '13:00', icon: '☀️' },
+                          { label: 'Evening 18:00', time: '18:00', icon: '🌆' },
+                          { label: 'Night 20:30', time: '20:30', icon: '🌙' },
                         ].map((slot) => (
                           <button
                             key={slot.time}
@@ -2510,7 +2522,7 @@ export default function CreatePostPage() {
                       </div>
 
                       <div className="flex items-center gap-2 pt-1">
-                        <span className="text-xs text-slate-500 font-medium">নির্দিষ্ট সময়:</span>
+                        <span className="text-xs text-slate-500 font-medium">Custom Time:</span>
                         <input
                           type="time"
                           value={scheduleTime}
@@ -2562,14 +2574,14 @@ export default function CreatePostPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-sm text-amber-950">
-                            {activeAccount.name} ({activeAccount.platform}): আলাদা কন্টেন্ট এডিট মোড সক্রিয়
+                            {activeAccount.name} ({activeAccount.platform}): Custom edit mode active
                           </p>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
-                            আনলকড (Custom Active)
+                            Unlocked (Custom Active)
                           </span>
                         </div>
                         <p className="text-xs text-amber-800 font-medium mt-0.5">
-                          এখানে লেখা ক্যাপশন ও মিডিয়া শুধুমাত্র এই {activeAccount.platform} চ্যানেলেই পোস্ট হবে।
+                          Captions and media customized here will only be posted to {activeAccount.platform}.
                         </p>
                       </div>
                     </div>
@@ -2578,9 +2590,9 @@ export default function CreatePostPage() {
                       type="button"
                       onClick={() => resetChannelToMaster(activeAccount.id)}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-amber-100 text-amber-900 font-bold border border-amber-300 transition text-xs flex-shrink-0 cursor-pointer shadow-xs"
-                      title="মাস্টার পোস্টের সাথে পুনরায় লক এবং সিঙ্ক করুন"
+                      title="Lock and sync back with Master Post"
                     >
-                      <RotateCcw className="w-3.5 h-3.5" /> 🔒 পুনরায় লক করুন (মাস্টার সিঙ্ক)
+                      <RotateCcw className="w-3.5 h-3.5" /> 🔒 Re-lock (Sync with Master)
                     </button>
                   </div>
                 ) : (
@@ -2593,14 +2605,14 @@ export default function CreatePostPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-sm text-slate-900">
-                            {activeAccount.name} ({activeAccount.platform}): মাস্টার পোস্টের সাথে লক করা আছে
+                            {activeAccount.name} ({activeAccount.platform}): Synced with Master Post
                           </p>
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300">
-                            লকড (Locked to Master)
+                            Locked (Synced to Master)
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 font-medium mt-0.5">
-                          এই অ্যাকাউন্টের কন্টেন্ট মূল পোস্টের সাথে সিঙ্ক করা। মূল পোস্টে যা লিখবেন, এখানেও তাই অটোমেটিক থাকবে।
+                          Content for this account is synced with the Master Post. Whatever you write in Master will be published here automatically.
                         </p>
                       </div>
                     </div>
@@ -2617,9 +2629,9 @@ export default function CreatePostPage() {
                         }));
                       }}
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition text-xs flex-shrink-0 cursor-pointer shadow-xs"
-                      title="এই প্ল্যাটফর্মের জন্য আলাদা কন্টেন্ট লিখতে আনলক করুন"
+                      title="Unlock to write custom content for this channel"
                     >
-                      <span>🔓 আনলক করে আলাদা কন্টেন্ট লিখুন</span>
+                      <span>🔓 Unlock to Customize Content</span>
                     </button>
                   </div>
                 );
@@ -2684,7 +2696,7 @@ export default function CreatePostPage() {
                             isMaster
                               ? 'What would you like to share across all channels? Type @ to mention a page, user or audience...'
                               : isChannelLocked
-                              ? `কন্টেন্ট মাস্টার পোস্টের সাথে লক করা আছে। আলাদা ক্যাপশন লিখতে নিচের আনলক বাটনে ক্লিক করুন...`
+                              ? 'Content is currently locked to Master Post. Click Unlock below to customize caption specifically for this channel...'
                               : `Customize caption specifically for ${activeAccount?.name}... Type @ to mention...`
                           }
                           className={`w-full p-3.5 rounded-xl border text-sm leading-relaxed transition ${
@@ -2699,7 +2711,7 @@ export default function CreatePostPage() {
                           <div className="mt-2 p-3 rounded-xl bg-indigo-50/80 border border-indigo-200/80 flex flex-wrap items-center justify-between gap-2 text-xs animate-in fade-in">
                             <span className="text-indigo-950 font-medium flex items-center gap-1.5">
                               <Lock className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
-                              এই ক্যাপশনটি মাস্টার পোস্টের সাথে লক করা আছে। আলাদা লিখতে চান?
+                              This caption is synced with the Master Post. Want to write a custom version?
                             </span>
                             <button
                               type="button"
@@ -2716,7 +2728,7 @@ export default function CreatePostPage() {
                               }}
                               className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition text-xs cursor-pointer shadow-xs"
                             >
-                              🔓 আনলক করে আলাদা ক্যাপশন লিখুন
+                              🔓 Unlock & Customize Caption
                             </button>
                           </div>
                         )}
@@ -2750,14 +2762,14 @@ export default function CreatePostPage() {
                             <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
                           )}
                           <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-xs text-white text-[11px] font-bold px-2.5 py-1 rounded-lg border border-white/20 flex items-center gap-1.5 shadow-md">
-                            <Lock className="w-3 h-3 text-amber-400" /> মাস্টার মিডিয়ার সাথে লকড
+                            <Lock className="w-3 h-3 text-amber-400" /> Synced with Master Media
                           </div>
                         </div>
                       ) : (
                         <div className="border-2 border-dashed border-slate-200 bg-slate-50/70 rounded-2xl p-6 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
                           <Lock className="w-6 h-6 text-slate-400" />
-                          <p className="font-semibold text-slate-700">মিডিয়া মাস্টার পোস্টের সাথে লক করা আছে</p>
-                          <p className="text-[11px] text-slate-400">এই চ্যানেলের জন্য আলাদা ছবি বা ভিডিও আপলোড করতে উপরে আনলক করুন।</p>
+                          <p className="font-semibold text-slate-700">Media is synced with the Master Post</p>
+                          <p className="text-[11px] text-slate-400">To attach separate images or videos for this channel, unlock customization above.</p>
                         </div>
                       );
                     }
@@ -3108,14 +3120,14 @@ export default function CreatePostPage() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-indigo-600" /> কোন তারিখে পোস্ট হবে? (Select Date)
+                          <Calendar className="w-3.5 h-3.5 text-indigo-600" /> Schedule Date
                         </label>
                         <span className="text-[11px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-full border border-indigo-200">
                           {scheduleDate === getTodayDateStr()
-                            ? '⚡ আজকে (Today)'
+                            ? '⚡ Today'
                             : scheduleDate === getTomorrowDateStr()
-                            ? '📅 কালকে (Tomorrow)'
-                            : `তারিখ: ${scheduleDate}`}
+                            ? '📅 Tomorrow'
+                            : `Date: ${scheduleDate}`}
                         </span>
                       </div>
 
@@ -3133,7 +3145,7 @@ export default function CreatePostPage() {
                               : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
-                          ⚡ আজকে (Today)
+                          ⚡ Today
                         </button>
 
                         <button
@@ -3149,7 +3161,7 @@ export default function CreatePostPage() {
                               : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
-                          📅 কালকে (Tomorrow)
+                          📅 Tomorrow
                         </button>
 
                         <div className="relative">
@@ -3171,24 +3183,24 @@ export default function CreatePostPage() {
                       </div>
                     </div>
 
-                    {/* 2. Time Selector: কয়টা বাজে পোস্ট হবে? */}
+                    {/* 2. Time Selector */}
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-indigo-600" /> কয়টা বাজে পোস্ট হবে? (Select Time)
+                          <Clock className="w-3.5 h-3.5 text-indigo-600" /> Schedule Time
                         </label>
                         <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                          সময়: {scheduleTime}
+                          Time: {scheduleTime}
                         </span>
                       </div>
 
                       {/* Quick Popular Time Slots */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2.5">
                         {[
-                          { label: 'সকাল ০৯:০০', time: '09:00', icon: '🌅' },
-                          { label: 'দুপুর ০১:০০', time: '13:00', icon: '☀️' },
-                          { label: 'সন্ধ্যা ০৬:০০', time: '18:00', icon: '🌆' },
-                          { label: 'রাত ০৮:৩০', time: '20:30', icon: '🌙' },
+                          { label: 'Morning 09:00', time: '09:00', icon: '🌅' },
+                          { label: 'Afternoon 13:00', time: '13:00', icon: '☀️' },
+                          { label: 'Evening 18:00', time: '18:00', icon: '🌆' },
+                          { label: 'Night 20:30', time: '20:30', icon: '🌙' },
                         ].map((slot) => (
                           <button
                             key={slot.time}
@@ -3211,7 +3223,7 @@ export default function CreatePostPage() {
 
                       {/* Custom Exact Time Picker */}
                       <div className="flex items-center gap-2 pt-1">
-                        <span className="text-xs text-slate-500 font-medium">নির্দিষ্ট সময় (Custom Time):</span>
+                        <span className="text-xs text-slate-500 font-medium">Custom Time:</span>
                         <input
                           type="time"
                           value={scheduleTime}
@@ -3228,7 +3240,7 @@ export default function CreatePostPage() {
                     <div className="p-2.5 rounded-xl bg-white border border-indigo-100 text-xs font-semibold text-indigo-900 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                       <span>
-                        নির্ধারিত সময়: <strong>{scheduleDate === getTodayDateStr() ? 'আজকে' : scheduleDate === getTomorrowDateStr() ? 'আগামী কালকে' : scheduleDate}</strong>, সময় <strong>{scheduleTime}</strong> টায় অটোমেটিক পোস্ট হবে।
+                        Scheduled for: <strong>{scheduleDate === getTodayDateStr() ? 'Today' : scheduleDate === getTomorrowDateStr() ? 'Tomorrow' : scheduleDate}</strong> at <strong>{scheduleTime}</strong> (will be published automatically).
                       </span>
                     </div>
                   </div>
