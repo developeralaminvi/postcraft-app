@@ -1207,7 +1207,7 @@ export default function CreatePostPage() {
       })
       .catch(console.error);
 
-    const paramDate = searchParams.get('scheduledAt');
+    const paramDate = searchParams.get('scheduledAt') || searchParams.get('date');
     if (paramDate) {
       const parsedDate = new Date(paramDate);
       const isPast = !isNaN(parsedDate.getTime()) && parsedDate.getTime() < Date.now() - 60000;
@@ -1218,6 +1218,12 @@ export default function CreatePostPage() {
           const [d, t] = paramDate.split('T');
           setScheduleDate(d);
           setScheduleTime(t.slice(0, 5));
+        } else {
+          setScheduleDate(paramDate);
+          const customTime = searchParams.get('time');
+          if (customTime) {
+            setScheduleTime(customTime);
+          }
         }
       }
     } else {
@@ -1378,12 +1384,16 @@ export default function CreatePostPage() {
       return;
     }
 
+    let finalScheduledIso: string | undefined = undefined;
     if (publishMode === 'schedule') {
-      const scheduleDateTime = new Date(scheduledAt);
+      const [y, m, d] = scheduleDate.split('-').map(Number);
+      const [h, min] = scheduleTime.split(':').map(Number);
+      const scheduleDateTime = new Date(y, m - 1, d, h || 0, min || 0, 0, 0);
       if (isNaN(scheduleDateTime.getTime()) || scheduleDateTime.getTime() < Date.now() - 60000) {
         setError('Scheduled date and time cannot be in the past. Please select a present or future time.');
         return;
       }
+      finalScheduledIso = scheduleDateTime.toISOString();
     }
 
     if (isWpMode) {
@@ -1457,7 +1467,7 @@ export default function CreatePostPage() {
           mediaUrl: currentMediaUrl.trim() || undefined,
           mediaType: currentMediaType,
           publishNow: publishMode === 'now',
-          scheduledAt: publishMode === 'schedule' ? scheduledAt : undefined,
+          scheduledAt: publishMode === 'schedule' ? finalScheduledIso : undefined,
           autoComment:
             !isWpMode && masterEnableFirstComment && masterFirstCommentContent.trim()
               ? {
