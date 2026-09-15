@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 /**
  * WordPress REST API Integration Engine
@@ -263,15 +264,30 @@ export async function uploadWordPressMedia(
     let mimeType = 'image/jpeg';
 
     if (mediaUrl.startsWith('/uploads/')) {
-      const localPath = path.join(process.cwd(), 'public', mediaUrl);
+      const filename = path.basename(mediaUrl);
+      let localPath = path.join(process.cwd(), 'public', 'uploads', filename);
       if (!fs.existsSync(localPath)) {
-        return { success: false, error: 'Local media file not found' };
+        localPath = path.join(os.tmpdir(), 'postcraft_uploads', filename);
+      }
+      if (!fs.existsSync(localPath)) {
+        return { success: false, error: 'Local media file not found on server' };
       }
       fileBuffer = fs.readFileSync(localPath);
-      fileName = path.basename(localPath);
+      fileName = filename;
       if (fileName.endsWith('.png')) mimeType = 'image/png';
       else if (fileName.endsWith('.webp')) mimeType = 'image/webp';
       else if (fileName.endsWith('.gif')) mimeType = 'image/gif';
+      else if (fileName.endsWith('.mp4')) mimeType = 'video/mp4';
+      else if (fileName.endsWith('.webm')) mimeType = 'video/webm';
+    } else if (mediaUrl.startsWith('data:')) {
+      const match = mediaUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) {
+        return { success: false, error: 'Invalid data URL format' };
+      }
+      mimeType = match[1];
+      fileBuffer = Buffer.from(match[2], 'base64');
+      const ext = mimeType.split('/')[1] || 'jpg';
+      fileName = `upload_${Date.now()}.${ext}`;
     } else {
       const res = await fetch(mediaUrl);
       if (!res.ok) {
@@ -279,8 +295,12 @@ export async function uploadWordPressMedia(
       }
       const arrayBuffer = await res.arrayBuffer();
       fileBuffer = Buffer.from(arrayBuffer);
-      const urlPath = new URL(mediaUrl).pathname;
-      if (urlPath) fileName = path.basename(urlPath) || 'media.jpg';
+      try {
+        const urlPath = new URL(mediaUrl).pathname;
+        if (urlPath) fileName = path.basename(urlPath) || 'media.jpg';
+      } catch {
+        fileName = 'media.jpg';
+      }
       const contentType = res.headers.get('content-type');
       if (contentType) mimeType = contentType;
     }

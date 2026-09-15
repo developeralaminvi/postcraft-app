@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 /**
  * Meta Graph API Integration Helper
@@ -153,41 +154,61 @@ export async function publishFacebookPost(params: PublishPostParams): Promise<{
   }
 
   try {
-    // Check if media is a local uploaded file
+    // Check media source type
     const isLocalUpload = mediaUrl && mediaUrl.startsWith('/uploads/');
+    const isDataUrl = mediaUrl && mediaUrl.startsWith('data:');
     const isRemoteUrl = mediaUrl && (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://'));
+
+    // Helper to resolve media buffer & mime type
+    const resolveMediaBlob = () => {
+      if (isLocalUpload) {
+        const filename = path.basename(mediaUrl);
+        let localFilePath = path.join(process.cwd(), 'public', 'uploads', filename);
+        if (!fs.existsSync(localFilePath)) {
+          localFilePath = path.join(os.tmpdir(), 'postcraft_uploads', filename);
+        }
+        if (fs.existsSync(localFilePath)) {
+          const fileBuffer = fs.readFileSync(localFilePath);
+          const ext = path.extname(localFilePath).toLowerCase();
+          const mime = ext === '.mov' ? 'video/quicktime' : ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : ext === '.mp4' ? 'video/mp4' : 'image/jpeg';
+          return { blob: new Blob([fileBuffer], { type: mime }), filename };
+        }
+      } else if (isDataUrl) {
+        const match = mediaUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          const mime = match[1];
+          const buffer = Buffer.from(match[2], 'base64');
+          const ext = mime.split('/')[1] || (mediaType === 'VIDEO' ? 'mp4' : 'jpg');
+          return { blob: new Blob([buffer], { type: mime }), filename: `upload_${Date.now()}.${ext}` };
+        }
+      }
+      return null;
+    };
 
     // Case 1: Video Post
     if (mediaType === 'VIDEO' && mediaUrl) {
       const endpoint = `${GRAPH_BASE_URL}/${pageId}/videos`;
 
-      if (isLocalUpload) {
-        const localFilePath = path.join(process.cwd(), 'public', mediaUrl);
-        if (fs.existsSync(localFilePath)) {
-          const fileBuffer = fs.readFileSync(localFilePath);
-          const ext = path.extname(localFilePath).toLowerCase();
-          const mime = ext === '.mov' ? 'video/quicktime' : 'video/mp4';
-          const blob = new Blob([fileBuffer], { type: mime });
+      const resolved = resolveMediaBlob();
+      if (resolved) {
+        const formData = new FormData();
+        formData.append('source', resolved.blob, resolved.filename);
+        formData.append('description', message);
+        formData.append('access_token', accessToken);
 
-          const formData = new FormData();
-          formData.append('source', blob, path.basename(localFilePath));
-          formData.append('description', message);
-          formData.append('access_token', accessToken);
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
+        const data = await res.json();
 
-          const res = await fetch(endpoint, { method: 'POST', body: formData });
-          const data = await res.json();
-
-          if (!res.ok || data.error) {
-            return { success: false, error: data.error?.message || 'Failed to upload video' };
-          }
-
-          const videoId = data.id;
-          return {
-            success: true,
-            postId: `${pageId}_${videoId}`,
-            postUrl: `https://www.facebook.com/${videoId}`,
-          };
+        if (!res.ok || data.error) {
+          return { success: false, error: data.error?.message || 'Failed to upload video' };
         }
+
+        const videoId = data.id;
+        return {
+          success: true,
+          postId: `${pageId}_${videoId}`,
+          postUrl: `https://www.facebook.com/${videoId}`,
+        };
       } else if (isRemoteUrl) {
         const res = await fetch(endpoint, {
           method: 'POST',
@@ -214,33 +235,26 @@ export async function publishFacebookPost(params: PublishPostParams): Promise<{
     if (mediaType === 'IMAGE' && mediaUrl) {
       const endpoint = `${GRAPH_BASE_URL}/${pageId}/photos`;
 
-      if (isLocalUpload) {
-        const localFilePath = path.join(process.cwd(), 'public', mediaUrl);
-        if (fs.existsSync(localFilePath)) {
-          const fileBuffer = fs.readFileSync(localFilePath);
-          const ext = path.extname(localFilePath).toLowerCase();
-          const mime = ext === '.png' ? 'image/png' : ext === '.gif' ? 'image/gif' : 'image/jpeg';
-          const blob = new Blob([fileBuffer], { type: mime });
+      const resolved = resolveMediaBlob();
+      if (resolved) {
+        const formData = new FormData();
+        formData.append('source', resolved.blob, resolved.filename);
+        formData.append('caption', message);
+        formData.append('access_token', accessToken);
 
-          const formData = new FormData();
-          formData.append('source', blob, path.basename(localFilePath));
-          formData.append('caption', message);
-          formData.append('access_token', accessToken);
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
+        const data = await res.json();
 
-          const res = await fetch(endpoint, { method: 'POST', body: formData });
-          const data = await res.json();
-
-          if (!res.ok || data.error) {
-            return { success: false, error: data.error?.message || 'Failed to upload photo' };
-          }
-
-          const photoPostId = data.post_id || data.id;
-          return {
-            success: true,
-            postId: photoPostId,
-            postUrl: `https://www.facebook.com/${photoPostId}`,
-          };
+        if (!res.ok || data.error) {
+          return { success: false, error: data.error?.message || 'Failed to upload photo' };
         }
+
+        const photoPostId = data.post_id || data.id;
+        return {
+          success: true,
+          postId: photoPostId,
+          postUrl: `https://www.facebook.com/${photoPostId}`,
+        };
       } else if (isRemoteUrl) {
         const res = await fetch(endpoint, {
           method: 'POST',

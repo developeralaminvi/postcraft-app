@@ -83,6 +83,8 @@ export default function CreatePostPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wpFileInputRef = useRef<HTMLInputElement>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
@@ -455,7 +457,11 @@ export default function CreatePostPage() {
   const getEffectiveChannelData = (accId: string): ChannelCustomization => {
     const custom = customizations[accId];
     if (custom && custom.isCustomized) {
-      return custom;
+      return {
+        ...custom,
+        mediaUrl: custom.mediaUrl !== undefined && custom.mediaUrl !== '' ? custom.mediaUrl : masterMediaUrl,
+        mediaType: custom.mediaUrl !== undefined && custom.mediaUrl !== '' ? custom.mediaType : masterMediaType,
+      };
     }
     return {
       isCustomized: false,
@@ -510,11 +516,15 @@ export default function CreatePostPage() {
 
   const currentMediaUrl = isMaster
     ? masterMediaUrl
-    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].mediaUrl : masterMediaUrl);
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].mediaUrl !== undefined && customizations[activeTab].mediaUrl !== ''
+        ? customizations[activeTab].mediaUrl
+        : masterMediaUrl);
 
   const currentMediaType = isMaster
     ? masterMediaType
-    : (customizations[activeTab]?.isCustomized ? customizations[activeTab].mediaType : masterMediaType);
+    : (customizations[activeTab]?.isCustomized && customizations[activeTab].mediaUrl !== undefined && customizations[activeTab].mediaUrl !== ''
+        ? customizations[activeTab].mediaType
+        : masterMediaType);
 
   const currentEnableFirstComment = isMaster
     ? masterEnableFirstComment
@@ -683,9 +693,20 @@ export default function CreatePostPage() {
   };
 
   const updateActiveMedia = (url: string, type: 'TEXT' | 'IMAGE' | 'VIDEO') => {
-    if (isMaster) {
+    if (isMaster || composerMode === 'WORDPRESS') {
       setMasterMediaUrl(url);
       setMasterMediaType(type);
+      if (composerMode === 'WORDPRESS' && activeTab) {
+        setCustomizations((prev) => ({
+          ...prev,
+          [activeTab]: {
+            ...(prev[activeTab] || getEffectiveChannelData(activeTab)),
+            mediaUrl: url,
+            mediaType: type,
+            isCustomized: true,
+          },
+        }));
+      }
     } else {
       setCustomizations((prev) => {
         const existing = prev[activeTab] || getEffectiveChannelData(activeTab);
@@ -705,6 +726,7 @@ export default function CreatePostPage() {
   const removeActiveMedia = () => {
     updateActiveMedia('', 'TEXT');
     if (fileInputRef.current) fileInputRef.current.value = '';
+    if (wpFileInputRef.current) wpFileInputRef.current.value = '';
   };
 
   const updateActiveFirstCommentEnabled = (enabled: boolean) => {
@@ -1236,10 +1258,21 @@ export default function CreatePostPage() {
     }
   }, [accounts, selectedAccountIds, activeTab, isMaster]);
 
-  // Direct File Upload Handler
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Unified Direct File Processor with Instant Client Preview
+  const processMediaFile = async (file: File) => {
     if (!file) return;
+
+    const mime = file.type.toLowerCase();
+    const isVideo = mime.startsWith('video/');
+    const mediaType: 'VIDEO' | 'IMAGE' = isVideo ? 'VIDEO' : 'IMAGE';
+
+    // 1. Instant client-side preview with 0ms delay!
+    try {
+      const localPreviewUrl = URL.createObjectURL(file);
+      updateActiveMedia(localPreviewUrl, mediaType);
+    } catch (e) {
+      console.warn('Could not create ObjectURL:', e);
+    }
 
     setUploadingMedia(true);
     setError(null);
@@ -1259,12 +1292,22 @@ export default function CreatePostPage() {
         return;
       }
 
-      updateActiveMedia(data.url, data.mediaType);
+      // 2. Seamlessly replace local preview with persistent URL
+      updateActiveMedia(data.url, data.mediaType || mediaType);
     } catch (err: any) {
       setError(err?.message || 'Network error during upload');
     } finally {
       setUploadingMedia(false);
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processMediaFile(file);
+    }
+    // Reset input value so re-selecting the exact same file fires onChange
+    e.target.value = '';
   };
 
   // Toggle account selection
@@ -1825,11 +1868,27 @@ export default function CreatePostPage() {
 
                 {!currentMediaUrl ? (
                   <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-blue-200 hover:border-[#21759B] bg-blue-50/30 hover:bg-blue-50/70 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                    onClick={() => wpFileInputRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingOver(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setIsDraggingOver(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDraggingOver(false);
+                      const dropped = e.dataTransfer.files?.[0];
+                      if (dropped) processMediaFile(dropped);
+                    }}
+                    className={`border-2 border-dashed ${
+                      isDraggingOver ? 'border-[#21759B] bg-blue-100/60 scale-[1.01]' : 'border-blue-200 hover:border-[#21759B] bg-blue-50/30 hover:bg-blue-50/70'
+                    } rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group`}
                   >
                     <input
-                      ref={fileInputRef}
+                      ref={wpFileInputRef}
                       type="file"
                       accept="image/*"
                       onChange={handleFileUpload}
@@ -2706,7 +2765,23 @@ export default function CreatePostPage() {
                     return !currentMediaUrl ? (
                       <div
                         onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30 rounded-2xl p-6 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 group"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setIsDraggingOver(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          setIsDraggingOver(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setIsDraggingOver(false);
+                          const dropped = e.dataTransfer.files?.[0];
+                          if (dropped) processMediaFile(dropped);
+                        }}
+                        className={`border-2 border-dashed ${
+                          isDraggingOver ? 'border-indigo-500 bg-indigo-50/80 scale-[1.01]' : 'border-slate-300 hover:border-indigo-500 bg-slate-50/60 hover:bg-indigo-50/30'
+                        } rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2 group`}
                       >
                         <input
                           ref={fileInputRef}
@@ -2734,7 +2809,7 @@ export default function CreatePostPage() {
                     ) : (
                       <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group">
                         {currentMediaType === 'VIDEO' ? (
-                          <video src={currentMediaUrl} controls className="w-full max-h-64 object-cover" />
+                          <video src={currentMediaUrl} controls playsInline preload="metadata" className="w-full max-h-64 object-cover" />
                         ) : (
                           <img src={currentMediaUrl} alt="Uploaded" className="w-full max-h-64 object-cover" />
                         )}
@@ -3356,7 +3431,7 @@ export default function CreatePostPage() {
                   {previewData.mediaUrl && (
                     <div className="relative w-full max-h-72 overflow-hidden bg-slate-900 border-b border-slate-100">
                       {previewData.mediaType === 'VIDEO' ? (
-                        <video src={previewData.mediaUrl} controls className="w-full max-h-72 object-cover" />
+                        <video src={previewData.mediaUrl} controls playsInline preload="metadata" className="w-full max-h-72 object-cover bg-black" />
                       ) : (
                         <img
                           src={previewData.mediaUrl}
@@ -3483,7 +3558,7 @@ export default function CreatePostPage() {
                   {previewData.mediaUrl && (
                     <div className="w-full bg-slate-950 max-h-84 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
                       {previewData.mediaType === 'VIDEO' ? (
-                        <video src={previewData.mediaUrl} controls className="w-full max-h-84 object-cover" />
+                        <video src={previewData.mediaUrl} controls playsInline preload="metadata" className="w-full max-h-84 object-cover bg-black" />
                       ) : (
                         <img src={previewData.mediaUrl} alt="LinkedIn Post Media" className="w-full object-cover max-h-84" />
                       )}
@@ -3577,7 +3652,7 @@ export default function CreatePostPage() {
                   <div className="w-full bg-slate-950 aspect-square max-h-96 overflow-hidden flex items-center justify-center relative">
                     {previewData.mediaUrl ? (
                       previewData.mediaType === 'VIDEO' ? (
-                        <video src={previewData.mediaUrl} controls className="w-full h-full object-cover" />
+                        <video src={previewData.mediaUrl} controls playsInline preload="metadata" className="w-full h-full object-cover bg-black" />
                       ) : (
                         <img src={previewData.mediaUrl} alt="Instagram Post" className="w-full h-full object-cover" />
                       )
@@ -3672,7 +3747,7 @@ export default function CreatePostPage() {
                   {previewData.mediaUrl && (
                     <div className="w-full bg-slate-900 max-h-80 overflow-hidden flex items-center justify-center border-t border-b border-slate-100">
                       {previewData.mediaType === 'VIDEO' ? (
-                        <video src={previewData.mediaUrl} controls className="w-full max-h-80 object-cover" />
+                        <video src={previewData.mediaUrl} controls playsInline preload="metadata" className="w-full max-h-80 object-cover bg-black" />
                       ) : (
                         <img src={previewData.mediaUrl} alt="Attachment" className="w-full object-cover max-h-80" />
                       )}
