@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Linkedin,
   Instagram,
-  Globe
+  Globe,
+  Sparkles,
 } from 'lucide-react';
 
 interface Comment {
@@ -75,9 +76,33 @@ export default function PostsPage() {
     }
   };
 
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+
   useEffect(() => {
     fetchPosts();
+
+    const onRefresh = () => fetchPosts();
+    window.addEventListener('postcraft:refresh', onRefresh);
+    return () => window.removeEventListener('postcraft:refresh', onRefresh);
   }, []);
+
+  const handleRunAutoPilot = async () => {
+    setIsProcessingQueue(true);
+    try {
+      const res = await fetch('/api/cron/process', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`⚡ Auto-Pilot executed! Processed: ${data.postsProcessed || 0} posts, ${data.commentsProcessed || 0} comments, ${data.milestonesTriggered || 0} milestones`);
+        fetchPosts();
+      } else {
+        alert(data.error || 'Failed to process queue');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error executing auto-pilot');
+    } finally {
+      setIsProcessingQueue(false);
+    }
+  };
 
   const handlePublishNow = async (id: string) => {
     setActionLoading(id);
@@ -127,15 +152,24 @@ export default function PostsPage() {
 
         <div className="flex items-center gap-3">
           <button
+            onClick={handleRunAutoPilot}
+            disabled={isProcessingQueue}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-sm transition cursor-pointer disabled:opacity-50"
+            title="Immediately trigger background publishing and milestone checks"
+          >
+            <Sparkles className={`w-4 h-4 text-indigo-600 ${isProcessingQueue ? 'animate-spin' : ''}`} />
+            {isProcessingQueue ? 'Processing...' : '⚡ Run Auto-Pilot'}
+          </button>
+          <button
             onClick={fetchPosts}
-            className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition"
+            className="p-2.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-600 transition cursor-pointer"
             title="Refresh list"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
           <Link
             href="/dashboard/create-post"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm transition"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-sm transition cursor-pointer"
           >
             <PenSquare className="w-4 h-4" /> New Post
           </Link>
@@ -304,18 +338,22 @@ export default function PostsPage() {
                       </a>
                     )}
 
-                    {isScheduled && (
+                    {(isScheduled || isFailed) && (
                       <button
                         onClick={() => handlePublishNow(post.id)}
                         disabled={actionLoading === post.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold transition disabled:opacity-50"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition disabled:opacity-50 ${
+                          isFailed
+                            ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                            : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                        }`}
                       >
                         {actionLoading === post.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <Send className="w-3.5 h-3.5" />
                         )}
-                        Publish Now
+                        {isFailed ? 'Retry Publish' : 'Publish Now'}
                       </button>
                     )}
 

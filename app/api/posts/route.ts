@@ -5,6 +5,7 @@ import { publishFacebookPost, publishFacebookComment } from '@/lib/facebook';
 import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
 import { publishWordPressPost, publishWordPressComment } from '@/lib/wordpress';
+import { processDuePosts } from '@/lib/scheduler';
 
 export async function GET() {
   try {
@@ -12,6 +13,9 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Automatically trigger and publish any due scheduled posts
+    await processDuePosts().catch((err) => console.error('Error auto-processing due posts in GET:', err));
 
     const posts = await prisma.post.findMany({
       where: { userId: user.id },

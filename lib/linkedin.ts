@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 /**
  * LinkedIn Community Management & UGC API Integration
@@ -31,6 +32,110 @@ export interface PublishLinkedInCommentParams {
 }
 
 const LINKEDIN_API_BASE = 'https://api.linkedin.com';
+
+/**
+ * Upload binary media (Image or Video) to LinkedIn Asset Storage
+ */
+export async function uploadLinkedInMediaAsset(
+  authorUrn: string,
+  accessToken: string,
+  mediaUrl: string,
+  mediaType: 'IMAGE' | 'VIDEO' = 'IMAGE'
+): Promise<{ success: boolean; assetUrn?: string; error?: string }> {
+  try {
+    let fileBuffer: Buffer | null = null;
+    let mimeType = mediaType === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+
+    if (mediaUrl.startsWith('data:')) {
+      const match = mediaUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        fileBuffer = Buffer.from(match[2], 'base64');
+      }
+    } else if (mediaUrl.startsWith('/uploads/')) {
+      const filename = path.basename(mediaUrl);
+      let localPath = path.join(process.cwd(), 'public', 'uploads', filename);
+      if (!fs.existsSync(localPath)) {
+        localPath = path.join(os.tmpdir(), 'postcraft_uploads', filename);
+      }
+      if (fs.existsSync(localPath)) {
+        fileBuffer = fs.readFileSync(localPath);
+        const ext = path.extname(localPath).toLowerCase();
+        mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : ext === '.mp4' ? 'video/mp4' : 'image/jpeg';
+      }
+    } else if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+      const res = await fetch(mediaUrl);
+      if (res.ok) {
+        const ct = res.headers.get('content-type');
+        if (ct) mimeType = ct;
+        fileBuffer = Buffer.from(await res.arrayBuffer());
+      }
+    }
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return { success: false, error: 'Could not load media binary for LinkedIn upload' };
+    }
+
+    // Step 1: Register upload with LinkedIn Assets API
+    const isVideo = mediaType === 'VIDEO';
+    const recipe = isVideo
+      ? 'urn:li:digitalmediaRecipe:feedshare-video'
+      : 'urn:li:digitalmediaRecipe:feedshare-image';
+
+    const regRes = await fetch(`${LINKEDIN_API_BASE}/v2/assets?action=registerUpload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+      body: JSON.stringify({
+        registerUploadRequest: {
+          recipes: [recipe],
+          owner: authorUrn,
+          serviceRelationships: [
+            {
+              relationshipType: 'OWNER',
+              identifier: 'urn:li:userGeneratedContent',
+            },
+          ],
+        },
+      }),
+    });
+
+    const regData = await regRes.json();
+    if (!regRes.ok || !regData.value) {
+      return { success: false, error: regData.message || 'Failed to register media with LinkedIn' };
+    }
+
+    const uploadUrl =
+      regData.value.uploadMechanism?.[
+        'com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest'
+      ]?.uploadUrl;
+    const assetUrn = regData.value.asset;
+
+    if (!uploadUrl || !assetUrn) {
+      return { success: false, error: 'LinkedIn asset upload URL missing' };
+    }
+
+    // Step 2: Upload file buffer to signed uploadUrl
+    const upRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': mimeType,
+      },
+      body: new Uint8Array(fileBuffer),
+    });
+
+    if (!upRes.ok) {
+      return { success: false, error: `LinkedIn binary upload failed (HTTP ${upRes.status})` };
+    }
+
+    return { success: true, assetUrn };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'LinkedIn media upload exception' };
+  }
+}
 
 /**
  * Verify LinkedIn Author URN and Access Token
@@ -118,8 +223,6 @@ export async function verifyLinkedInAccount(
       const personSub = data.sub || data.id;
       if (personSub) {
         resolvedId = `urn:li:person:${personSub}`;
-      } else if (!resolvedId.startsWith('urn:li:')) {
-        resolvedId = `urn:li:person:${resolvedId}`;
       }
     }
 
@@ -164,16 +267,73 @@ export async function publishLinkedInPost(params: PublishLinkedInPostParams): Pr
   }
 
   try {
-    const formattedAuthor = authorUrn.startsWith('urn:li:')
-      ? authorUrn
-      : /^\d+$/.test(authorUrn)
-      ? `urn:li:organization:${authorUrn}`
-      : `urn:li:person:${authorUrn}`;
+    // Auto-resolve author if containing 'me' or incomplete URN
+    let formattedAuthor = authorUrn.trim();
+    if (formattedAuthor.includes('me') || !formattedAuthor.startsWith('urn:li:')) {
+      try {
+        const uInfoRes = await fetch(`${LINKEDIN_API_BASE}/v2/userinfo`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (uInfoRes.ok) {
+          const uData = await uInfoRes.json();
+          const sub = uData.sub || uData.id;
+          if (sub) {
+            formattedAuthor = `urn:li:person:${sub}`;
+          }
+        }
+      } catch {
+        // keep existing formattedAuthor
+      }
+    }
+    if (!formattedAuthor.startsWith('urn:li:')) {
+      formattedAuthor = /^\d+$/.test(formattedAuthor)
+        ? `urn:li:organization:${formattedAuthor}`
+        : `urn:li:person:${formattedAuthor}`;
+    }
 
-    let publicMediaUrl = mediaUrl;
-    if (mediaUrl && mediaUrl.startsWith('/uploads/')) {
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-      publicMediaUrl = `${appUrl}${mediaUrl}`;
+    // Handle Media Upload if present
+    let mediaPayload: any = null;
+    let shareCategory = 'NONE';
+
+    if (mediaUrl) {
+      const isVideo = mediaType === 'VIDEO';
+      const isPublicWebUrl =
+        (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) &&
+        !mediaUrl.includes('localhost') &&
+        !mediaUrl.includes('127.0.0.1');
+
+      if (isPublicWebUrl) {
+        shareCategory = isVideo ? 'VIDEO' : 'IMAGE';
+        mediaPayload = [
+          {
+            status: 'READY',
+            originalUrl: mediaUrl,
+            title: { text: commentary.slice(0, 30) || 'PostCraft Media' },
+          },
+        ];
+      } else {
+        // Upload directly as a LinkedIn digital media asset
+        const assetResult = await uploadLinkedInMediaAsset(
+          formattedAuthor,
+          accessToken,
+          mediaUrl,
+          mediaType === 'VIDEO' ? 'VIDEO' : 'IMAGE'
+        );
+
+        if (assetResult.success && assetResult.assetUrn) {
+          shareCategory = isVideo ? 'VIDEO' : 'IMAGE';
+          mediaPayload = [
+            {
+              status: 'READY',
+              media: assetResult.assetUrn,
+              title: { text: commentary.slice(0, 30) || 'PostCraft Media' },
+            },
+          ];
+        } else {
+          console.warn('LinkedIn asset upload failed, falling back to text post:', assetResult.error);
+          shareCategory = 'NONE';
+        }
+      }
     }
 
     // Build LinkedIn UGC Post Payload
@@ -185,7 +345,7 @@ export async function publishLinkedInPost(params: PublishLinkedInPostParams): Pr
           shareCommentary: {
             text: commentary || '',
           },
-          shareMediaCategory: mediaUrl ? (mediaType === 'VIDEO' ? 'VIDEO' : 'IMAGE') : 'NONE',
+          shareMediaCategory: shareCategory,
         },
       },
       visibility: {
@@ -193,16 +353,8 @@ export async function publishLinkedInPost(params: PublishLinkedInPostParams): Pr
       },
     };
 
-    if (publicMediaUrl) {
-      ugcPayload.specificContent['com.linkedin.ugc.ShareContent'].media = [
-        {
-          status: 'READY',
-          originalUrl: publicMediaUrl,
-          title: {
-            text: commentary.slice(0, 30) || 'PostCraft Media',
-          },
-        },
-      ];
+    if (mediaPayload && mediaPayload.length > 0) {
+      ugcPayload.specificContent['com.linkedin.ugc.ShareContent'].media = mediaPayload;
     }
 
     const res = await fetch(`${LINKEDIN_API_BASE}/v2/ugcPosts`, {

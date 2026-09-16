@@ -23,6 +23,7 @@ import {
 import {
   publishWordPressPost,
   publishWordPressComment,
+  getWordPressEngagement,
 } from './wordpress';
 
 /**
@@ -331,7 +332,15 @@ export async function processMilestoneTriggers() {
       let reactionsCount = 0;
       let commentsCount = 0;
 
-      if (platform === 'LINKEDIN') {
+      if (platform === 'WORDPRESS') {
+        const stats = await getWordPressEngagement(
+          post.account.accountId,
+          post.platformPostId,
+          post.account.accessToken
+        );
+        reactionsCount = stats.reactionsCount;
+        commentsCount = stats.commentsCount;
+      } else if (platform === 'LINKEDIN') {
         const stats = await getLinkedInEngagement(
           post.platformPostId,
           post.account.accessToken
@@ -376,7 +385,14 @@ export async function processMilestoneTriggers() {
 
         if (shouldTrigger) {
           let commentResult;
-          if (platform === 'LINKEDIN') {
+          if (platform === 'WORDPRESS') {
+            commentResult = await publishWordPressComment({
+              siteUrl: post.account.accountId,
+              credentials: post.account.accessToken,
+              postId: post.platformPostId,
+              content: milestone.commentText,
+            });
+          } else if (platform === 'LINKEDIN') {
             commentResult = await publishLinkedInComment({
               postUrn: post.platformPostId,
               accessToken: post.account.accessToken,
@@ -588,4 +604,44 @@ export async function processAllDueJobs() {
     replies: replyResults,
     timestamp: new Date().toISOString(),
   };
+}
+
+declare global {
+  var __schedulerDaemonStarted: boolean | undefined;
+}
+
+/**
+ * In-process background Auto-Pilot runner (runs periodically in Node.js server)
+ */
+export function startAutoPilotDaemon(intervalMs = 15000) {
+  if (typeof globalThis !== 'undefined') {
+    if (globalThis.__schedulerDaemonStarted) {
+      return;
+    }
+    globalThis.__schedulerDaemonStarted = true;
+    console.log(`[PostCraft AutoPilot] Background scheduler daemon initialized (every ${intervalMs / 1000}s)`);
+
+    // Run first tick after 3 seconds
+    setTimeout(async () => {
+      try {
+        await processAllDueJobs();
+      } catch (err) {
+        console.error('[PostCraft AutoPilot] Error in initial background tick:', err);
+      }
+    }, 3000);
+
+    // Then recurring interval
+    setInterval(async () => {
+      try {
+        await processAllDueJobs();
+      } catch (err) {
+        console.error('[PostCraft AutoPilot] Error in background scheduler:', err);
+      }
+    }, intervalMs);
+  }
+}
+
+// Auto-boot daemon on module evaluation if in server environment
+if (typeof window === 'undefined') {
+  startAutoPilotDaemon(15000);
 }

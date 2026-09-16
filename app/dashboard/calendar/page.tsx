@@ -25,6 +25,7 @@ import {
   ArrowRight,
   Check,
   AlertCircle,
+  Loader2,
 } from 'lucide-react';
 
 interface Milestone {
@@ -46,6 +47,7 @@ interface Post {
   publishedAt?: string;
   createdAt: string;
   platformPostUrl?: string;
+  errorMessage?: string | null;
   reactionsCount: number;
   commentsCount: number;
   account: {
@@ -77,8 +79,10 @@ export default function CalendarPage() {
   const [rescheduleDate, setRescheduleDate] = useState<string>('');
   const [rescheduleTime, setRescheduleTime] = useState<string>('18:00');
   const [isUpdatingSchedule, setIsUpdatingSchedule] = useState(false);
+  const [isPublishingNow, setIsPublishingNow] = useState(false);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
 
-  useEffect(() => {
+  const fetchPosts = () => {
     fetch('/api/posts')
       .then((res) => res.json())
       .then((data) => {
@@ -86,7 +90,57 @@ export default function CalendarPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchPosts();
+
+    const onRefresh = () => fetchPosts();
+    window.addEventListener('postcraft:refresh', onRefresh);
+    return () => window.removeEventListener('postcraft:refresh', onRefresh);
   }, []);
+
+  const handlePublishNow = async (postId: string) => {
+    setIsPublishingNow(true);
+    try {
+      const res = await fetch(`/api/posts/${postId}/publish`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('🚀 Post successfully published live!', 'success');
+        if (data.post) {
+          setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, ...data.post } : p)));
+          setSelectedPost((prev) => (prev && prev.id === postId ? { ...prev, ...data.post } : null));
+        } else {
+          fetchPosts();
+        }
+      } else {
+        showToast(data.error || 'Failed to publish post', 'error');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Error publishing post', 'error');
+    } finally {
+      setIsPublishingNow(false);
+    }
+  };
+
+  const handleRunAutoPilot = async () => {
+    setIsProcessingQueue(true);
+    try {
+      const res = await fetch('/api/cron/process', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        const msg = `⚡ Auto-pilot processed: ${data.postsProcessed || 0} posts, ${data.commentsProcessed || 0} comments`;
+        showToast(msg, 'success');
+        fetchPosts();
+      } else {
+        showToast(data.error || 'Failed to process queue', 'error');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Error triggering auto-pilot', 'error');
+    } finally {
+      setIsProcessingQueue(false);
+    }
+  };
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -496,6 +550,16 @@ export default function CalendarPage() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
+          <button
+            type="button"
+            onClick={handleRunAutoPilot}
+            disabled={isProcessingQueue}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition cursor-pointer disabled:opacity-50"
+            title="Immediately trigger background publishing and milestone checks"
+          >
+            <Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${isProcessingQueue ? 'animate-spin' : ''}`} />
+            {isProcessingQueue ? 'Processing...' : '⚡ Run Auto-Pilot'}
+          </button>
           <Link
             href="/dashboard/create-post"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
@@ -908,6 +972,43 @@ export default function CalendarPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Error message banner if post failed */}
+            {selectedPost.errorMessage && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-rose-950">Publishing Notice / Error:</p>
+                  <p className="text-[11px] text-rose-800 leading-relaxed">{selectedPost.errorMessage}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Live Publish Action if not published */}
+            {selectedPost.status !== 'PUBLISHED' && (
+              <div className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 shadow-2xs">
+                <div>
+                  <p className="text-xs font-bold text-emerald-950">Ready to publish right now?</p>
+                  <p className="text-[11px] text-emerald-700">Send immediately to {selectedPost.account?.platform} without waiting for scheduled time.</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={isPublishingNow}
+                  onClick={() => handlePublishNow(selectedPost.id)}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 flex-shrink-0"
+                >
+                  {isPublishingNow ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Publishing...
+                    </>
+                  ) : (
+                    <>
+                      <span>🚀 Publish Now</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Interactive Reschedule Section if not published */}
             {selectedPost.status !== 'PUBLISHED' && (
