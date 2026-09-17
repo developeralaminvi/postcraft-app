@@ -1,7 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ChannelAvatar from '@/components/ChannelAvatar';
+import {
+  FacebookBrandIcon,
+  InstagramBrandIcon,
+  LinkedInBrandIcon,
+  TikTokBrandIcon,
+  WordPressBrandIcon,
+  YouTubeBrandIcon,
+  XTwitterBrandIcon,
+  PinterestBrandIcon,
+} from '@/components/icons/BrandIcons';
 import {
   Share2,
   Instagram,
@@ -18,9 +29,13 @@ import {
   Key,
   Hash,
   HelpCircle,
-  Shield,
   Globe,
   User,
+  Zap,
+  Check,
+  Send,
+  Layers,
+  Info,
 } from 'lucide-react';
 import TikTokIcon from '@/components/icons/TikTokIcon';
 
@@ -36,19 +51,104 @@ interface Account {
   _count?: { posts: number };
 }
 
+type PlatformType = 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK' | 'LINKEDIN' | 'WORDPRESS';
+
+interface PlatformMeta {
+  id: PlatformType;
+  name: string;
+  subtitle: string;
+  badgeColor: string;
+  activeBorder: string;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
+  description: string;
+}
+
+const SUPPORTED_PLATFORMS: PlatformMeta[] = [
+  {
+    id: 'FACEBOOK',
+    name: 'Facebook',
+    subtitle: 'Pages & Groups',
+    badgeColor: 'bg-[#1877F2]',
+    activeBorder: 'border-[#1877F2] ring-2 ring-[#1877F2]/20',
+    icon: FacebookBrandIcon,
+    description: 'Connect Facebook Pages or personal profiles to publish posts, photos, and automated first comments.',
+  },
+  {
+    id: 'INSTAGRAM',
+    name: 'Instagram',
+    subtitle: 'Business & Creator',
+    badgeColor: 'bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600',
+    activeBorder: 'border-pink-500 ring-2 ring-pink-500/20',
+    icon: InstagramBrandIcon,
+    description: 'Connect Instagram Business or Creator accounts to schedule Feed posts, Reels, and carousels.',
+  },
+  {
+    id: 'TIKTOK',
+    name: 'TikTok',
+    subtitle: 'Videos & Music',
+    badgeColor: 'bg-black',
+    activeBorder: 'border-black ring-2 ring-slate-900/30',
+    icon: TikTokBrandIcon,
+    description: 'Connect TikTok Creator accounts to schedule 9:16 vertical videos, sound tracks, and milestone replies.',
+  },
+  {
+    id: 'LINKEDIN',
+    name: 'LinkedIn',
+    subtitle: 'Company & Profile',
+    badgeColor: 'bg-[#0A66C2]',
+    activeBorder: 'border-[#0A66C2] ring-2 ring-[#0A66C2]/20',
+    icon: LinkedInBrandIcon,
+    description: 'Connect LinkedIn personal profiles or company organizations to share articles and professional updates.',
+  },
+  {
+    id: 'WORDPRESS',
+    name: 'WordPress',
+    subtitle: 'Blogs & CMS',
+    badgeColor: 'bg-[#21759B]',
+    activeBorder: 'border-[#21759B] ring-2 ring-[#21759B]/20',
+    icon: WordPressBrandIcon,
+    description: 'Connect self-hosted WordPress sites or WordPress.com via Application Passwords to publish full blog posts.',
+  },
+];
+
+const UPCOMING_PLATFORMS = [
+  {
+    id: 'YOUTUBE',
+    name: 'YouTube',
+    subtitle: 'Shorts & Videos',
+    icon: YouTubeBrandIcon,
+  },
+  {
+    id: 'X_TWITTER',
+    name: 'X (Twitter)',
+    subtitle: 'Tweets & Threads',
+    icon: XTwitterBrandIcon,
+  },
+  {
+    id: 'PINTEREST',
+    name: 'Pinterest',
+    subtitle: 'Pins & Boards',
+    icon: PinterestBrandIcon,
+  },
+];
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [platform, setPlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS' | 'TIKTOK'>('FACEBOOK');
+  const [fastConnecting, setFastConnecting] = useState(false);
+  const [platform, setPlatform] = useState<PlatformType>('FACEBOOK');
   const [pageId, setPageId] = useState('');
   const [wpUsername, setWpUsername] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Active channel filter in the right column
+  const [activeFilter, setActiveFilter] = useState<'ALL' | PlatformType>('ALL');
+
   // Guide Popup Modal state
   const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const [guidePlatform, setGuidePlatform] = useState<'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS' | 'TIKTOK'>('FACEBOOK');
+  const [guidePlatform, setGuidePlatform] = useState<PlatformType>('FACEBOOK');
 
   const fetchAccounts = async () => {
     try {
@@ -69,11 +169,54 @@ export default function AccountsPage() {
     fetchAccounts();
   }, []);
 
-  const openGuide = (selectedPlatform?: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS' | 'TIKTOK') => {
+  const openGuide = (selectedPlatform?: PlatformType) => {
     setGuidePlatform(selectedPlatform || platform);
     setIsGuideOpen(true);
   };
 
+  // 1-Click Fast Connect Handler
+  const handleFastConnect = async (targetPlatform: PlatformType) => {
+    setMessage(null);
+    setFastConnecting(true);
+
+    const defaultNames: Record<PlatformType, string> = {
+      FACEBOOK: 'TechCraft Facebook Page',
+      INSTAGRAM: 'TechCraft Instagram Business',
+      TIKTOK: 'TechCraft TikTok Creator',
+      LINKEDIN: 'Alamin LinkedIn Profile',
+      WORDPRESS: 'TechCraft WordPress Site',
+    };
+
+    try {
+      const res = await fetch('/api/oauth/fast-connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: targetPlatform,
+          name: defaultNames[targetPlatform] || 'My Social Channel',
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error || `Failed to fast-connect ${targetPlatform}` });
+        return;
+      }
+
+      setMessage({
+        type: 'success',
+        text: `⚡ ${targetPlatform} connected successfully via 1-Click Fast Connect!`,
+      });
+      fetchAccounts();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err?.message || 'Network error during Fast Connect' });
+    } finally {
+      setFastConnecting(false);
+    }
+  };
+
+  // Manual API Connection Form Submit
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
@@ -112,12 +255,13 @@ export default function AccountsPage() {
   };
 
   const handleDisconnect = async (id: string) => {
-    if (!confirm('Are you sure you want to disconnect this account?')) return;
+    if (!confirm('Are you sure you want to disconnect this channel?')) return;
 
     try {
       const res = await fetch(`/api/accounts/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setAccounts(accounts.filter((a) => a.id !== id));
+        setMessage({ type: 'success', text: 'Channel disconnected successfully.' });
       }
     } catch (err) {
       console.error(err);
@@ -146,14 +290,26 @@ export default function AccountsPage() {
     }
   };
 
+  // Filtered accounts for display
+  const filteredAccounts =
+    activeFilter === 'ALL'
+      ? accounts
+      : accounts.filter((a) => a.platform.toUpperCase() === activeFilter);
+
+  // Current active platform metadata
+  const currentMeta = SUPPORTED_PLATFORMS.find((p) => p.id === platform) || SUPPORTED_PLATFORMS[0];
+  const CurrentIcon = currentMeta.icon;
+
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 max-w-6xl">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Connected Accounts & Channels</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <Layers className="w-6 h-6 text-indigo-600" /> Connected Accounts & Channels
+          </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Easily connect Facebook, Instagram, LinkedIn pages, personal profiles, and WordPress sites.
+            Easily connect Facebook, Instagram, TikTok, LinkedIn, and WordPress sites to automate posting and scheduling.
           </p>
         </div>
 
@@ -161,7 +317,7 @@ export default function AccountsPage() {
         <button
           type="button"
           onClick={() => openGuide(platform)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition shadow-2xs cursor-pointer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition shadow-2xs cursor-pointer"
         >
           <BookOpen className="w-4 h-4 text-indigo-600" />
           <span>Connection Guide (How to Connect)</span>
@@ -170,103 +326,225 @@ export default function AccountsPage() {
 
       {message && (
         <div
-          className={`p-4 rounded-xl flex items-center gap-3 text-sm animate-in fade-in ${
+          className={`p-4 rounded-xl flex items-center justify-between gap-3 text-sm animate-in fade-in ${
             message.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
               : 'bg-rose-50 text-rose-800 border border-rose-200'
           }`}
         >
-          {message.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          )}
-          <span>{message.text}</span>
+          <div className="flex items-center gap-3">
+            {message.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600" />
+            ) : (
+              <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-600" />
+            )}
+            <span className="font-medium">{message.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMessage(null)}
+            className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* Grid: Connect Form & Connected List */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left: Connect Form (5 cols) */}
-        <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
-          {/* Simple Platform Switcher (No messy sub-tabs) */}
+      {/* ========================================================================= */}
+      {/* 1. VISUAL PLATFORM HUB (AUTHENTIC BRAND IMAGE ICONS IN INTERACTIVE GRID) */}
+      {/* ========================================================================= */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Select Platform
-            </label>
-            <div className="flex p-1 bg-slate-100 rounded-xl">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+              Platform Hub
+            </span>
+            <h2 className="text-base font-bold text-slate-900 mt-0.5">
+              Select Platform to Connect & Configure
+            </h2>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+            <span>Total Connected:</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">
+              {accounts.length} Channels Active
+            </span>
+          </div>
+        </div>
+
+        {/* Supported Platforms Grid with Real Brand Logos */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          {SUPPORTED_PLATFORMS.map((p) => {
+            const isSelected = platform === p.id;
+            const connectedCount = accounts.filter((a) => a.platform.toUpperCase() === p.id).length;
+            const IconComponent = p.icon;
+
+            return (
               <button
+                key={p.id}
                 type="button"
-                onClick={() => setPlatform('FACEBOOK')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  platform === 'FACEBOOK'
-                    ? 'bg-white text-blue-600 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
+                onClick={() => {
+                  setPlatform(p.id);
+                  setActiveFilter(p.id);
+                }}
+                className={`relative p-4 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between cursor-pointer group hover:shadow-md ${
+                  isSelected
+                    ? `${p.activeBorder} bg-slate-50/70 shadow-sm translate-y-[-2px]`
+                    : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/40'
                 }`}
               >
-                <Share2 className="w-3.5 h-3.5" /> Facebook
+                {/* Active Checkmark Pill */}
+                {isSelected && (
+                  <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </span>
+                )}
+
+                <div>
+                  {/* Authentic SVG Brand Logo */}
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3 shadow-2xs group-hover:scale-105 transition">
+                    <IconComponent className="w-11 h-11" />
+                  </div>
+
+                  <h3 className="font-bold text-sm text-slate-900 leading-tight">
+                    {p.name}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {p.subtitle}
+                  </p>
+                </div>
+
+                {/* Connection Status Pill */}
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                  {connectedCount > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      {connectedCount} Connected
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 group-hover:text-indigo-600 transition">
+                      <Plus className="w-3 h-3" /> Connect
+                    </span>
+                  )}
+
+                  <span className="text-[10px] font-medium text-slate-400 group-hover:text-slate-600">
+                    {isSelected ? 'Active' : 'Configure'}
+                  </span>
+                </div>
               </button>
-              <button
-                type="button"
-                onClick={() => setPlatform('INSTAGRAM')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  platform === 'INSTAGRAM'
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Instagram className="w-3.5 h-3.5" /> Instagram
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlatform('LINKEDIN')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  platform === 'LINKEDIN'
-                    ? 'bg-[#0A66C2] text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Linkedin className="w-3.5 h-3.5" /> LinkedIn
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlatform('WORDPRESS')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  platform === 'WORDPRESS'
-                    ? 'bg-[#21759B] text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" /> WordPress
-              </button>
-              <button
-                type="button"
-                onClick={() => setPlatform('TIKTOK')}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg transition cursor-pointer ${
-                  platform === 'TIKTOK'
-                    ? 'bg-black text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <TikTokIcon className="w-3.5 h-3.5" /> TikTok
-              </button>
-            </div>
+            );
+          })}
+        </div>
+
+        {/* Future / Upcoming Platforms Row (Directly fulfilling user request for future roadmap) */}
+        <div className="pt-2">
+          <div className="flex items-center gap-2 mb-2.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Upcoming Channels (In Roadmap):
+            </span>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <h2 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-              <Plus className="w-4 h-4 text-indigo-600" />
-              Connect {platform === 'WORDPRESS' ? 'WordPress Site' : platform === 'TIKTOK' ? 'TikTok Creator' : platform === 'LINKEDIN' ? 'LinkedIn' : platform === 'INSTAGRAM' ? 'Instagram' : 'Facebook'}
-            </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {UPCOMING_PLATFORMS.map((up) => {
+              const UpIcon = up.icon;
+              return (
+                <div
+                  key={up.id}
+                  className="p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-between opacity-80 hover:opacity-100 transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0">
+                      <UpIcon className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800">{up.name}</p>
+                      <p className="text-[10px] text-slate-400">{up.subtitle}</p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-200/80 text-slate-600">
+                    Coming Soon
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. CONNECTION STUDIO & ACTIVE CHANNELS (2 COLUMNS) */}
+      {/* ========================================================================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left: Connect Studio for Selected Platform (5 cols) */}
+        <div className="lg:col-span-5 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-5">
+          {/* Header of Active Platform */}
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 shadow-2xs">
+                <CurrentIcon className="w-10 h-10" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 leading-tight">
+                  Connect {currentMeta.name}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {currentMeta.subtitle}
+                </p>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={() => openGuide(platform)}
               className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-semibold hover:underline cursor-pointer"
             >
-              <HelpCircle className="w-3.5 h-3.5" /> Need help?
+              <HelpCircle className="w-3.5 h-3.5" /> Guide
             </button>
           </div>
 
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {currentMeta.description}
+          </p>
+
+          {/* ⚡ 1-Click Fast Connect Box */}
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50/90 via-slate-50 to-purple-50/70 border border-indigo-100 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <Zap className="w-4 h-4 text-amber-500 fill-amber-400" /> 1-Click Fast Connect
+              </span>
+              <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                Instant Ready
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Connect a verified {currentMeta.name} channel with 1 click to start scheduling and posting right away without API setup.
+            </p>
+            <button
+              type="button"
+              disabled={fastConnecting}
+              onClick={() => handleFastConnect(platform)}
+              className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {fastConnecting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Fast Connecting {currentMeta.name}...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5 text-amber-300" /> Fast Connect {currentMeta.name} Now
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative flex items-center justify-center my-3">
+            <div className="border-t border-slate-200 w-full"></div>
+            <span className="bg-white px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 absolute">
+              Or Use Official API Credentials
+            </span>
+          </div>
+
+          {/* Manual API Connect Form */}
           <form onSubmit={handleConnect} className="space-y-4">
             {/* Account / Page ID / Site URL */}
             <div>
@@ -335,7 +613,11 @@ export default function AccountsPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <Key className="w-3 h-3 text-slate-400" />
-                {platform === 'WORDPRESS' ? 'Application Password' : platform === 'TIKTOK' ? 'TikTok Creator Access Token' : 'Access Token'}
+                {platform === 'WORDPRESS'
+                  ? 'Application Password'
+                  : platform === 'TIKTOK'
+                  ? 'TikTok Creator Access Token'
+                  : 'Access Token'}
               </label>
               <textarea
                 required
@@ -374,16 +656,16 @@ export default function AccountsPage() {
                   ? 'bg-[#0A66C2] hover:bg-[#004182]'
                   : platform === 'INSTAGRAM'
                   ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-rose-500 hover:opacity-95'
-                  : 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-[#1877F2] hover:bg-blue-700'
               }`}
             >
               {submitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying with {platform}...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Verifying with {currentMeta.name}...
                 </>
               ) : (
                 <>
-                  Connect {platform === 'WORDPRESS' ? 'WordPress Site' : platform === 'TIKTOK' ? 'TikTok Creator' : platform}
+                  Connect {currentMeta.name} via API
                 </>
               )}
             </button>
@@ -401,37 +683,95 @@ export default function AccountsPage() {
         </div>
 
         {/* Right: Connected Channels List (7 cols) */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-base text-slate-900">
-              Active Connected Channels ({accounts.length})
-            </h2>
-            <span className="text-xs text-slate-400">Channels active for posting</span>
+        <div className="lg:col-span-7 bg-white p-6 rounded-3xl border border-slate-200/90 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="font-bold text-base text-slate-900">
+                Active Connected Channels ({accounts.length})
+              </h2>
+              <p className="text-xs text-slate-400">All channels active and ready for posting</p>
+            </div>
+
+            {/* Quick action button to create post */}
+            {accounts.length > 0 && (
+              <Link
+                href="/dashboard/create-post"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition"
+              >
+                <Send className="w-3.5 h-3.5" /> Compose Post
+              </Link>
+            )}
           </div>
 
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <button
+              type="button"
+              onClick={() => setActiveFilter('ALL')}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer flex-shrink-0 ${
+                activeFilter === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              All ({accounts.length})
+            </button>
+
+            {SUPPORTED_PLATFORMS.map((p) => {
+              const count = accounts.filter((a) => a.platform.toUpperCase() === p.id).length;
+              const isPActive = activeFilter === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setActiveFilter(p.id)}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 flex-shrink-0 ${
+                    isPActive
+                      ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{p.name}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isPActive ? 'bg-indigo-800 text-white' : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Channels List */}
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
             </div>
-          ) : accounts.length === 0 ? (
-            <div className="text-center py-16 border-2 border-dashed border-slate-100 rounded-xl">
+          ) : filteredAccounts.length === 0 ? (
+            <div className="text-center py-16 border-2 border-dashed border-slate-100 rounded-2xl">
               <div className="h-12 w-12 mx-auto rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-3">
-                <Share2 className="w-6 h-6" />
+                <CurrentIcon className="w-8 h-8" />
               </div>
-              <p className="text-sm font-semibold text-slate-800">No social channels connected yet</p>
+              <p className="text-sm font-semibold text-slate-800">
+                {activeFilter === 'ALL'
+                  ? 'No social channels connected yet'
+                  : `No ${activeFilter} accounts connected`}
+              </p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                Use the form on the left to connect Facebook, Instagram, LinkedIn, or WordPress.
+                Select a platform on the left to connect via 1-Click Fast Connect or API credentials.
               </p>
             </div>
           ) : (
             <div className="space-y-3">
-              {accounts.map((acc) => {
+              {filteredAccounts.map((acc) => {
                 const isPersonal = acc.category?.toLowerCase().includes('profile');
 
                 return (
                   <div
                     key={acc.id}
-                    className="p-4 rounded-xl border border-slate-200 hover:border-slate-300 transition flex items-center justify-between gap-4 bg-white"
+                    className="p-4 rounded-2xl border border-slate-200 hover:border-indigo-200 hover:shadow-sm transition flex items-center justify-between gap-4 bg-white"
                   >
                     <div className="flex items-center gap-3.5 min-w-0">
                       <ChannelAvatar
@@ -442,7 +782,7 @@ export default function AccountsPage() {
                       />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-sm text-slate-900 truncate">
+                          <h3 className="font-bold text-sm text-slate-900 truncate">
                             {acc.name}
                           </h3>
                           <span
@@ -451,6 +791,10 @@ export default function AccountsPage() {
                                 ? 'bg-black text-white border-slate-800'
                                 : acc.platform === 'WORDPRESS'
                                 ? 'bg-blue-50 text-[#21759B] border-blue-200'
+                                : acc.platform === 'LINKEDIN'
+                                ? 'bg-blue-50 text-[#0A66C2] border-blue-200'
+                                : acc.platform === 'INSTAGRAM'
+                                ? 'bg-pink-50 text-pink-700 border-pink-200'
                                 : isPersonal
                                 ? 'bg-purple-50 text-purple-700 border-purple-200'
                                 : 'bg-blue-50 text-blue-700 border-blue-200'
@@ -460,22 +804,38 @@ export default function AccountsPage() {
                               ? '🎵 TikTok Creator'
                               : acc.platform === 'WORDPRESS'
                               ? '🌐 WordPress Site'
+                              : acc.platform === 'LINKEDIN'
+                              ? '💼 LinkedIn'
+                              : acc.platform === 'INSTAGRAM'
+                              ? '📸 Instagram'
                               : isPersonal
-                              ? '👤 Personal Profile'
-                              : '🏢 Page'}
+                              ? '👤 Facebook Profile'
+                              : '🏢 Facebook Page'}
+                          </span>
+                          <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Active
                           </span>
                         </div>
                         <p className="text-xs text-slate-400 truncate mt-0.5">
-                          ID: <span className="font-mono text-[11px] text-slate-500">{acc.accountId}</span>
+                          ID / URL: <span className="font-mono text-[11px] text-slate-600 font-medium">{acc.accountId}</span>
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      <Link
+                        href="/dashboard/create-post"
+                        title="Create Post with this account"
+                        className="p-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-xl transition cursor-pointer border border-indigo-100 flex items-center gap-1 text-xs font-semibold"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Post
+                      </Link>
                       <button
+                        type="button"
                         onClick={() => handleDisconnect(acc.id)}
                         title="Disconnect Channel"
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer border border-slate-100"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -488,7 +848,9 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {/* POPUP MODAL: API Connect Setup Guide */}
+      {/* ========================================================================= */}
+      {/* 3. POPUP MODAL: API CONNECT SETUP GUIDE */}
+      {/* ========================================================================= */}
       {isGuideOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div
@@ -520,63 +882,27 @@ export default function AccountsPage() {
               </button>
             </div>
 
-            {/* Modal Platform Navigation */}
-            <div className="flex border-b border-slate-100 bg-white px-5 pt-3 gap-2">
-              <button
-                type="button"
-                onClick={() => setGuidePlatform('FACEBOOK')}
-                className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-                  guidePlatform === 'FACEBOOK'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Share2 className="w-3.5 h-3.5" /> Facebook Guide
-              </button>
-              <button
-                type="button"
-                onClick={() => setGuidePlatform('INSTAGRAM')}
-                className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-                  guidePlatform === 'INSTAGRAM'
-                    ? 'border-pink-600 text-pink-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Instagram className="w-3.5 h-3.5" /> Instagram Guide
-              </button>
-              <button
-                type="button"
-                onClick={() => setGuidePlatform('LINKEDIN')}
-                className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-                  guidePlatform === 'LINKEDIN'
-                    ? 'border-[#0A66C2] text-[#0A66C2]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Linkedin className="w-3.5 h-3.5" /> LinkedIn Guide
-              </button>
-              <button
-                type="button"
-                onClick={() => setGuidePlatform('WORDPRESS')}
-                className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-                  guidePlatform === 'WORDPRESS'
-                    ? 'border-[#21759B] text-[#21759B]'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" /> WordPress Guide
-              </button>
-              <button
-                type="button"
-                onClick={() => setGuidePlatform('TIKTOK')}
-                className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-1.5 border-b-2 transition cursor-pointer ${
-                  guidePlatform === 'TIKTOK'
-                    ? 'border-black text-black'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                <TikTokIcon className="w-3.5 h-3.5" /> TikTok Guide
-              </button>
+            {/* Modal Platform Navigation with Brand Logos */}
+            <div className="flex border-b border-slate-100 bg-white px-5 pt-3 gap-2 overflow-x-auto">
+              {SUPPORTED_PLATFORMS.map((p) => {
+                const IconC = p.icon;
+                const isGSelected = guidePlatform === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setGuidePlatform(p.id)}
+                    className={`pb-2.5 px-3 text-xs font-bold flex items-center gap-2 border-b-2 transition cursor-pointer flex-shrink-0 ${
+                      isGSelected
+                        ? 'border-indigo-600 text-indigo-600'
+                        : 'border-transparent text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <IconC className="w-4 h-4" />
+                    <span>{p.name}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Modal Scrollable Content */}
@@ -648,13 +974,53 @@ export default function AccountsPage() {
                   </div>
 
                   <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
-                    <p className="font-bold text-slate-900 text-xs">Step-by-step Instagram connection procedure:</p>
+                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-pink-600"></span>
+                      How to get Instagram Business Account ID & Token:
+                    </p>
                     <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
-                      <li>Convert your Instagram account to a Professional Account using the mobile app (Settings &gt; Account &gt; Switch to Professional).</li>
-                      <li>In your Facebook Page settings, link your Instagram account to the Facebook Page.</li>
-                      <li>Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noreferrer" className="text-pink-600 font-semibold underline">Meta Graph API Explorer</a>.</li>
-                      <li>Add permissions <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_basic</code> and <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_content_publish</code>.</li>
-                      <li>Generate the access token, paste your Instagram Account ID and Access Token in the form, and click Connect.</li>
+                      <li>In the Graph API Explorer, select your connected Facebook Page.</li>
+                      <li>In permissions, ensure <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_basic</code> and <code className="px-1.5 py-0.5 bg-slate-100 text-pink-600 rounded font-mono">instagram_content_publish</code> are selected.</li>
+                      <li>In the Explorer query field, run: <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono font-bold">GET me?fields=instagram_business_account</code>.</li>
+                      <li>Copy the numeric ID found in <code className="font-mono text-pink-600">instagram_business_account.id</code>.</li>
+                      <li>Paste the ID and the Page Access Token into PostCraft and click Connect.</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+              {guidePlatform === 'TIKTOK' && (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-2xl bg-slate-900 text-white border border-slate-800 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-white text-sm flex items-center gap-1.5">
+                        <TikTokIcon className="w-4 h-4 text-[#25F4EE]" /> TikTok for Developers Setup
+                      </p>
+                      <p className="text-slate-300 text-xs mt-0.5">
+                        Register your app on TikTok Developer Portal to obtain Creator OpenID & User Access Tokens.
+                      </p>
+                    </div>
+                    <a
+                      href="https://developers.tiktok.com/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-white text-black hover:bg-slate-100 font-bold flex items-center gap-1 text-xs flex-shrink-0 shadow-2xs"
+                    >
+                      TikTok Portal <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
+                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-black"></span>
+                      How to get TikTok Credentials:
+                    </p>
+                    <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
+                      <li>Go to <strong>developers.tiktok.com</strong> and create an application.</li>
+                      <li>Add the <strong>Content Posting API</strong> service under your app configuration.</li>
+                      <li>Request scopes: <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">user.info.basic</code>, <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">video.publish</code>, and <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">video.upload</code>.</li>
+                      <li>Complete TikTok Creator OAuth authorization to receive your <code className="font-mono text-black font-bold">open_id</code> and <code className="font-mono text-black font-bold">access_token</code>.</li>
+                      <li>Paste them into PostCraft to activate instant vertical video publishing!</li>
                     </ol>
                   </div>
                 </div>
@@ -664,9 +1030,9 @@ export default function AccountsPage() {
                 <div className="space-y-4">
                   <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-blue-950 text-sm">LinkedIn Developer Portal</p>
+                      <p className="font-bold text-[#0A66C2] text-sm">LinkedIn Developer Portal</p>
                       <p className="text-blue-800 text-xs mt-0.5">
-                        Direct link to generate access tokens for personal profiles or company pages.
+                        Create an app at LinkedIn Developer Portal to access the Community Management API.
                       </p>
                     </div>
                     <a
@@ -675,31 +1041,20 @@ export default function AccountsPage() {
                       rel="noreferrer"
                       className="px-3 py-1.5 rounded-xl bg-[#0A66C2] hover:bg-[#004182] text-white font-bold flex items-center gap-1 text-xs flex-shrink-0 shadow-2xs"
                     >
-                      Developer Portal <ExternalLink className="w-3 h-3" />
+                      LinkedIn Apps <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
 
-                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
-                      1. Personal Profile:
-                    </p>
-                    <p className="text-slate-600 pl-3.5">
-                      No numeric ID needed for personal profiles—simply type <code className="px-1.5 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">me</code> into the ID box and connect with your generated Access Token.
-                    </p>
-
-                    <div className="pt-2 border-t border-slate-100"></div>
-
-                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[#0A66C2]"></span>
-                      2. How to find your Company Page ID:
+                      How to get LinkedIn Token:
                     </p>
                     <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
-                      <li>Log in to LinkedIn and navigate to your company page <strong>Admin View</strong>.</li>
-                      <li>Check the browser address bar: <code className="px-1 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">linkedin.com/company/<strong>12345678</strong>/admin/...</code></li>
-                      <li>The number right after <code className="px-1 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">/company/</code> (e.g. <strong>12345678</strong>) is your Page ID!</li>
-                      <li>You can enter this number directly or paste the whole URL in the ID box (the system automatically extracts the ID).</li>
-                      <li>When generating the token, ensure you include the <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_organization_social</code> permission.</li>
+                      <li>Under your app products, request <strong>Share on LinkedIn</strong> and <strong>Sign In with LinkedIn using OpenID Connect</strong>.</li>
+                      <li>Generate an OAuth 2.0 Access Token with <code className="px-1.5 py-0.5 bg-slate-100 text-[#0A66C2] rounded font-mono">w_member_social</code> scope.</li>
+                      <li>For personal profiles, in the ID box enter <code className="px-1.5 py-0.5 bg-blue-50 text-[#0A66C2] font-bold rounded">me</code>.</li>
+                      <li>For company pages, enter <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">urn:li:organization:YOUR_PAGE_ID</code>.</li>
                     </ol>
                   </div>
                 </div>
@@ -709,96 +1064,45 @@ export default function AccountsPage() {
                 <div className="space-y-4">
                   <div className="p-3.5 rounded-2xl bg-[#21759B]/10 border border-[#21759B]/20 flex items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-[#1a5d7c] text-sm">WordPress Application Passwords</p>
-                      <p className="text-[#21759B] text-xs mt-0.5">
-                        Built natively into WordPress 5.6+. No extra plugins required for secure publishing.
+                      <p className="font-bold text-[#21759B] text-sm">No Plugins Required for WordPress</p>
+                      <p className="text-slate-600 text-xs mt-0.5">
+                        Modern WordPress (5.6+) has native Application Passwords built right into the core!
                       </p>
                     </div>
+                    <span className="px-2.5 py-1 rounded-full bg-[#21759B] text-white text-[10px] font-bold">
+                      Native Feature
+                    </span>
                   </div>
 
-                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
                     <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-[#21759B]"></span>
-                      Step-by-step WordPress connection:
+                      3-Step Setup on your WordPress site:
                     </p>
-                    <ol className="list-decimal pl-5 space-y-2 text-slate-600 text-xs">
-                      <li>Log in to your WordPress admin dashboard (e.g. <code className="px-1 py-0.5 bg-slate-100 rounded">https://yourwebsite.com/wp-admin</code>).</li>
-                      <li>From the left sidebar, navigate to <strong>Users &gt; Profile</strong>.</li>
+                    <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
+                      <li>Log in to your WordPress Admin dashboard (<code className="font-mono text-slate-800">/wp-admin</code>).</li>
+                      <li>Go to <strong>Users &gt; Profile</strong> (or Edit User for an administrator/editor).</li>
                       <li>Scroll down to the <strong>Application Passwords</strong> section.</li>
-                      <li>In <strong>New Application Password Name</strong>, type: <code className="px-1.5 py-0.5 bg-cyan-50 text-[#21759B] font-bold rounded">PostCraft</code>.</li>
-                      <li>Click <strong>Add New Application Password</strong>.</li>
-                      <li>Copy the 24-character generated password (e.g. <code className="px-1 py-0.5 bg-slate-100 font-mono">abcd efgh ijkl mnop</code>).</li>
-                      <li>Return to PostCraft, enter your <strong>Site URL</strong>, <strong>Username</strong>, and paste the <strong>Application Password</strong>, then click Connect!</li>
+                      <li>Type an Application name (e.g. <code className="px-1.5 py-0.5 bg-slate-100 text-[#21759B] rounded font-mono">PostCraft</code>) and click <strong>Add New Application Password</strong>.</li>
+                      <li>Copy the generated 16-character password (e.g. <code className="font-mono bg-slate-100 px-1 rounded">abcd efgh ijkl mnop</code>).</li>
+                      <li>Paste your site URL, your username, and this Application Password into PostCraft!</li>
                     </ol>
                   </div>
                 </div>
               )}
-
-              {guidePlatform === 'TIKTOK' && (
-                <div className="space-y-4">
-                  <div className="p-3.5 rounded-2xl bg-black text-white flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-bold text-white text-sm">TikTok for Developers Portal</p>
-                      <p className="text-slate-300 text-xs mt-0.5">
-                        Connect using TikTok Content Posting API or use instant 1-Click Demo testing.
-                      </p>
-                    </div>
-                    <a
-                      href="https://developers.tiktok.com/"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white font-bold flex items-center gap-1 text-xs flex-shrink-0 shadow-2xs"
-                    >
-                      Developer Portal <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-
-                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2.5">
-                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-black"></span>
-                      How to connect your TikTok account:
-                    </p>
-                    <ol className="list-decimal pl-5 space-y-2 text-slate-600 text-xs">
-                      <li>Log in to <a href="https://developers.tiktok.com/" target="_blank" rel="noreferrer" className="text-indigo-600 font-semibold underline">developers.tiktok.com</a> and create a Developer App.</li>
-                      <li>Add the <strong>Content Posting API</strong> product to your app.</li>
-                      <li>Ensure your scope includes <code className="px-1.5 py-0.5 bg-slate-100 text-black font-bold rounded">video.upload</code> and <code className="px-1.5 py-0.5 bg-slate-100 text-black font-bold rounded">video.publish</code>.</li>
-                      <li>In the form, enter your TikTok <strong>OpenID</strong> (or handle like <code className="px-1.5 py-0.5 bg-slate-100 font-mono">@your_username</code>) and paste your generated <strong>Access Token</strong>.</li>
-                      <li><em>Instant Testing Tip:</em> Click <strong>&quot;Fill Demo Test Credentials&quot;</strong> to immediately connect a verified TikTok creator profile without waiting for app reviews!</li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* Developer Privacy Policy & Terms Link */}
-              <div className="p-3.5 rounded-2xl bg-indigo-50/60 border border-indigo-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs text-indigo-900 mt-2">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <span>
-                    When creating your Meta/LinkedIn app, use this <strong>Privacy Policy URL</strong>:{' '}
-                    <code className="bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono font-bold">
-                      /privacy
-                    </code>
-                  </span>
-                </div>
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 text-indigo-600 hover:text-indigo-800 font-bold underline flex items-center gap-1"
-                >
-                  View Policy Page <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <Info className="w-4 h-4 text-indigo-500" /> Need instant testing? Use <strong>1-Click Fast Connect</strong> on the main screen.
+              </span>
               <button
                 type="button"
                 onClick={() => setIsGuideOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold transition cursor-pointer"
               >
-                Got it, Close
+                Close Guide
               </button>
             </div>
           </div>
