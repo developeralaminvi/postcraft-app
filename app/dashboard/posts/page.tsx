@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import TikTokIcon from '@/components/icons/TikTokIcon';
 import {
   Calendar,
   Clock,
@@ -38,6 +39,7 @@ interface Post {
   excerpt?: string;
   content: string;
   mediaUrl?: string;
+  mediaType?: string;
   status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHING' | 'PUBLISHED' | 'FAILED';
   scheduledAt?: string;
   publishedAt?: string;
@@ -244,6 +246,8 @@ export default function PostsPage() {
                           ? 'bg-[#0A66C2]'
                           : post.account.platform === 'INSTAGRAM'
                           ? 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600'
+                          : post.account.platform === 'TIKTOK'
+                          ? 'bg-black'
                           : 'bg-blue-600'
                       }`}
                     >
@@ -259,6 +263,8 @@ export default function PostsPage() {
                         <Linkedin className="w-5 h-5" />
                       ) : post.account.platform === 'INSTAGRAM' ? (
                         <Instagram className="w-5 h-5" />
+                      ) : post.account.platform === 'TIKTOK' ? (
+                        <TikTokIcon className="w-5 h-5 text-white" />
                       ) : (
                         post.account.name.slice(0, 2).toUpperCase()
                       )}
@@ -276,6 +282,8 @@ export default function PostsPage() {
                               ? 'bg-blue-50 text-[#0A66C2] border-blue-200'
                               : post.account.platform === 'INSTAGRAM'
                               ? 'bg-pink-50 text-pink-700 border-pink-200'
+                              : post.account.platform === 'TIKTOK'
+                              ? 'bg-neutral-900 text-white border-neutral-800'
                               : 'bg-blue-50 text-blue-700 border-blue-200'
                           }`}
                         >
@@ -333,6 +341,8 @@ export default function PostsPage() {
                             ? 'LinkedIn'
                             : post.account.platform === 'INSTAGRAM'
                             ? 'Instagram'
+                            : post.account.platform === 'TIKTOK'
+                            ? 'TikTok'
                             : 'Facebook'
                         }
                       </a>
@@ -395,11 +405,20 @@ export default function PostsPage() {
 
                 {post.mediaUrl && (
                   <div className="mt-3 pl-13">
-                    <img
-                      src={post.mediaUrl}
-                      alt="Attachment"
-                      className="h-28 rounded-xl object-cover border border-slate-200"
-                    />
+                    {post.mediaType === 'VIDEO' ? (
+                      <video
+                        src={post.mediaUrl}
+                        controls
+                        playsInline
+                        className="h-32 rounded-xl object-cover border border-slate-200 bg-black"
+                      />
+                    ) : (
+                      <img
+                        src={post.mediaUrl}
+                        alt="Attachment"
+                        className="h-28 rounded-xl object-cover border border-slate-200"
+                      />
+                    )}
                   </div>
                 )}
 

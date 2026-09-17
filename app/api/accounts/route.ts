@@ -5,6 +5,7 @@ import { verifyFacebookPage, verifyFacebookAccount } from '@/lib/facebook';
 import { verifyInstagramAccount } from '@/lib/instagram';
 import { verifyLinkedInAccount } from '@/lib/linkedin';
 import { verifyWordPressAccount } from '@/lib/wordpress';
+import { verifyTikTokAccount } from '@/lib/tiktok';
 
 export async function GET() {
   try {
@@ -127,6 +128,21 @@ export async function POST(req: NextRequest) {
         name: verification.data.name,
         avatar: verification.data.avatar,
         category: 'WordPress Site / Blog',
+        token: verification.data.accessToken,
+      };
+    } else if (platform === 'TIKTOK') {
+      const verification = await verifyTikTokAccount(pageId.trim(), accessToken.trim());
+      if (!verification.success || !verification.data) {
+        return NextResponse.json(
+          { error: verification.error || 'Invalid TikTok credentials' },
+          { status: 400 }
+        );
+      }
+      accountData = {
+        id: verification.data.id,
+        name: verification.data.name,
+        avatar: verification.data.avatar,
+        category: verification.data.category || 'TikTok Creator Profile',
         token: verification.data.accessToken,
       };
     } else {

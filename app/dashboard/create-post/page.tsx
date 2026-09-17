@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ChannelAvatar from '@/components/ChannelAvatar';
+import TikTokIcon from '@/components/icons/TikTokIcon';
 import {
   Send,
   Calendar,
@@ -45,6 +46,7 @@ import {
   Lock,
   RefreshCw,
   Search,
+  Music,
 } from 'lucide-react';
 
 interface Account {
@@ -418,7 +420,7 @@ export default function CreatePostPage() {
 
   const [hoveredProfileData, setHoveredProfileData] = useState<{
     profile: MentionProfile;
-    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN';
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'TIKTOK';
     rect: { top: number; left: number };
   } | null>(null);
 
@@ -975,16 +977,30 @@ export default function CreatePostPage() {
 
   const renderFormattedTextWithMentions = (
     text: string,
-    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' = 'FACEBOOK'
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'TIKTOK' = 'FACEBOOK'
   ) => {
     if (!text) return null;
-    const parts = text.split(/(@[a-zA-Z0-9_\.]+|{[a-zA-Z0-9_]+})/g);
+    const parts = text.split(/(@[a-zA-Z0-9_\.]+|#[a-zA-Z0-9_\.]+|{[a-zA-Z0-9_]+})/g);
     return parts.map((part, index) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         return (
           <span
             key={index}
             className="px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 font-semibold text-[11px] border border-violet-200"
+          >
+            {part}
+          </span>
+        );
+      }
+      if (part.startsWith('#')) {
+        return (
+          <span
+            key={index}
+            className={`font-semibold cursor-pointer transition ${
+              platform === 'TIKTOK'
+                ? 'font-bold text-white hover:text-[#25F4EE] drop-shadow-xs'
+                : 'text-indigo-600 hover:text-indigo-700 hover:underline'
+            }`}
           >
             {part}
           </span>
@@ -997,14 +1013,16 @@ export default function CreatePostPage() {
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               setHoveredProfileData({
-                profile: findProfileByTag(part, platform),
+                profile: findProfileByTag(part, platform === 'TIKTOK' ? 'INSTAGRAM' : platform),
                 platform,
                 rect: { top: rect.top, left: rect.left },
               });
             }}
             onMouseLeave={() => setHoveredProfileData(null)}
             className={`font-semibold cursor-pointer transition inline-block ${
-              platform === 'LINKEDIN'
+              platform === 'TIKTOK'
+                ? 'text-white font-bold hover:text-[#25F4EE] drop-shadow-xs'
+                : platform === 'LINKEDIN'
                 ? 'text-[#0A66C2] hover:text-[#004182] bg-blue-50/70 hover:bg-blue-100 px-1 py-0.2 rounded'
                 : platform === 'INSTAGRAM'
                 ? 'text-sky-600 hover:text-sky-700 bg-sky-50/70 hover:bg-sky-100 px-1 py-0.2 rounded'
@@ -1418,6 +1436,15 @@ export default function CreatePostPage() {
             return;
           }
         }
+        if (acc?.platform === 'TIKTOK') {
+          const eff = getEffectiveChannelData(accId);
+          if (!eff.mediaUrl || eff.mediaType !== 'VIDEO') {
+            setError(
+              `TikTok account "${acc.name}" requires a video file. Please upload or attach a video (MP4/WebM) to publish on TikTok.`
+            );
+            return;
+          }
+        }
         const eff = getEffectiveChannelData(accId);
         if (!eff.content.trim()) {
           setError(`Post caption for "${acc?.name || 'Selected account'}" cannot be empty.`);
@@ -1531,6 +1558,7 @@ export default function CreatePostPage() {
   const previewPlatform = previewAccount?.platform || (isPreviewWordPress ? 'WORDPRESS' : 'FACEBOOK');
   const isPreviewLinkedIn = !isPreviewWordPress && previewPlatform === 'LINKEDIN';
   const isPreviewInstagram = !isPreviewWordPress && previewPlatform === 'INSTAGRAM';
+  const isPreviewTikTok = !isPreviewWordPress && previewPlatform === 'TIKTOK';
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -1575,7 +1603,7 @@ export default function CreatePostPage() {
                 composerMode === 'SOCIAL' ? 'bg-indigo-700 text-white' : 'bg-slate-200 text-slate-600'
               }`}
             >
-              Facebook • Instagram • LinkedIn
+              Facebook • Instagram • LinkedIn • TikTok
             </span>
           </button>
 
@@ -3301,6 +3329,8 @@ export default function CreatePostPage() {
                   ? 'bg-[#0A66C2] text-white'
                   : isPreviewInstagram
                   ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                  : isPreviewTikTok
+                  ? 'bg-black text-white ring-1 ring-slate-800'
                   : 'bg-blue-600 text-white'
               }`}
             >
@@ -3310,6 +3340,8 @@ export default function CreatePostPage() {
                 ? 'LinkedIn Desktop Feed'
                 : isPreviewInstagram
                 ? 'Instagram Mobile Feed'
+                : isPreviewTikTok
+                ? 'TikTok Mobile Feed'
                 : 'Facebook Desktop'}
             </span>
           </div>
@@ -3642,6 +3674,262 @@ export default function CreatePostPage() {
                           <p className="text-[10px] text-slate-500">Software Architect</p>
                           <div className="text-xs text-slate-800 whitespace-pre-wrap mt-1 leading-relaxed">
                             {renderFormattedTextWithMentions(previewData.firstCommentContent, 'LINKEDIN')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : isPreviewTikTok ? (
+                /* TIKTOK 9:16 SMARTPHONE LIVE FEED MOCKUP */
+                <div className="max-w-[360px] mx-auto rounded-[38px] bg-black border-[6px] border-slate-900 shadow-2xl overflow-hidden relative text-white select-none ring-1 ring-slate-800 animate-in fade-in">
+                  {/* Phone Top Notch / Dynamic Island & Status Bar */}
+                  <div className="pt-3 px-6 pb-2 flex items-center justify-between text-[11px] font-semibold tracking-tight text-white/90 z-20 relative bg-gradient-to-b from-black/80 to-transparent">
+                    <span>9:41</span>
+                    {/* Dynamic Island pill */}
+                    <div className="w-24 h-4.5 bg-neutral-900 rounded-full border border-neutral-800/80 flex items-center justify-end px-2 gap-1.5 shadow-inner">
+                      <span className="w-2.5 h-2.5 rounded-full bg-neutral-950 border border-neutral-800"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-950/80"></span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold">5G</span>
+                      <div className="w-5 h-2.5 border border-white/80 rounded-xs p-0.5 flex items-center">
+                        <div className="w-full h-full bg-white rounded-2xs"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TikTok Top Feed Navigation */}
+                  <div className="px-4 py-1.5 flex items-center justify-between text-xs font-semibold z-20 relative text-white/70">
+                    <div className="flex items-center gap-1.5 text-xs text-white/90 font-bold cursor-pointer">
+                      <span className="w-2 h-2 rounded-full bg-[#FE2C55] animate-pulse"></span>
+                      <span className="tracking-wide">LIVE</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[13px]">
+                      <span className="text-white/60 hover:text-white cursor-pointer font-medium transition">Following</span>
+                      <div className="relative font-bold text-white cursor-pointer">
+                        <span>For You</span>
+                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-white rounded-full"></span>
+                      </div>
+                    </div>
+                    <button type="button" className="text-white/90 hover:text-white cursor-pointer transition">
+                      <Search className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Main 9:16 Video / Stage Screen */}
+                  <div className="relative w-full h-[520px] bg-neutral-950 overflow-hidden flex items-center justify-center">
+                    {previewData.mediaUrl ? (
+                      previewData.mediaType === 'VIDEO' ? (
+                        <video
+                          src={previewData.mediaUrl}
+                          controls
+                          playsInline
+                          autoPlay
+                          loop
+                          muted
+                          preload="metadata"
+                          className="w-full h-full object-cover bg-black"
+                        />
+                      ) : (
+                        <div className="relative w-full h-full flex flex-col items-center justify-center bg-neutral-900">
+                          <img
+                            src={previewData.mediaUrl}
+                            alt="TikTok Attachment"
+                            className="w-full h-full object-cover opacity-90"
+                          />
+                          <div className="absolute top-3 left-3 right-3 bg-black/70 backdrop-blur-xs rounded-xl p-2.5 border border-white/10 text-center">
+                            <p className="text-[11px] font-semibold text-amber-300">
+                              ℹ️ Recommended: TikTok supports 9:16 vertical video posts
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      /* Placeholder when no video attached */
+                      <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-neutral-950 via-slate-900 to-black relative">
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#25F4EE]/10 via-[#FE2C55]/10 to-transparent pointer-events-none"></div>
+                        <div className="w-16 h-16 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center shadow-lg mb-3">
+                          <TikTokIcon className="w-8 h-8 text-white" />
+                        </div>
+                        <h4 className="text-sm font-bold text-white mb-1">TikTok Video Feed</h4>
+                        <p className="text-[11px] text-neutral-400 max-w-[210px] leading-relaxed mb-3">
+                          Attach or upload an MP4/WebM vertical video to preview full video playback.
+                        </p>
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full bg-neutral-800/80 border border-neutral-700 text-neutral-300 font-medium">
+                          <Music className="w-3 h-3 text-[#25F4EE]" /> 9:16 Vertical Fullscreen
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Right-Side Floating Action Column */}
+                    <div className="absolute right-2.5 bottom-16 z-20 flex flex-col items-center gap-4 text-white">
+                      {/* Creator Avatar with Red Plus Badge */}
+                      <div className="relative flex flex-col items-center">
+                        <div className="w-11 h-11 rounded-full ring-2 ring-white/90 overflow-hidden bg-neutral-800 shadow-md">
+                          {previewAccount.avatar ? (
+                            <img
+                              src={previewAccount.avatar}
+                              alt={previewAccount.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-neutral-800 to-neutral-700 text-xs font-bold text-white">
+                              {previewAccount.name?.slice(0, 2).toUpperCase() || 'TT'}
+                            </div>
+                          )}
+                        </div>
+                        {/* Plus Follow Badge */}
+                        <div className="w-4.5 h-4.5 rounded-full bg-[#FE2C55] text-white flex items-center justify-center -mt-2 z-10 shadow-sm cursor-pointer hover:scale-110 transition">
+                          <Plus className="w-3 h-3 stroke-[3]" />
+                        </div>
+                      </div>
+
+                      {/* Likes */}
+                      <button
+                        type="button"
+                        className="flex flex-col items-center group cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-black/30 backdrop-blur-xs group-hover:scale-110 transition">
+                          <Heart className="w-6 h-6 text-white group-hover:text-[#FE2C55] group-hover:fill-[#FE2C55] transition drop-shadow-md" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white/90 drop-shadow-sm mt-0.5">
+                          84.5K
+                        </span>
+                      </button>
+
+                      {/* Comments */}
+                      <button
+                        type="button"
+                        className="flex flex-col items-center group cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-black/30 backdrop-blur-xs group-hover:scale-110 transition">
+                          <MessageCircle className="w-6 h-6 text-white fill-white/20 group-hover:fill-white/40 transition drop-shadow-md" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white/90 drop-shadow-sm mt-0.5">
+                          1,392
+                        </span>
+                      </button>
+
+                      {/* Bookmarks */}
+                      <button
+                        type="button"
+                        className="flex flex-col items-center group cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-black/30 backdrop-blur-xs group-hover:scale-110 transition">
+                          <Bookmark className="w-6 h-6 text-white fill-white/20 group-hover:fill-amber-400 group-hover:text-amber-400 transition drop-shadow-md" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white/90 drop-shadow-sm mt-0.5">
+                          6,140
+                        </span>
+                      </button>
+
+                      {/* Share */}
+                      <button
+                        type="button"
+                        className="flex flex-col items-center group cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-black/30 backdrop-blur-xs group-hover:scale-110 transition">
+                          <Share2 className="w-6 h-6 text-white group-hover:text-[#25F4EE] transition drop-shadow-md" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white/90 drop-shadow-sm mt-0.5">
+                          924
+                        </span>
+                      </button>
+
+                      {/* Rotating Vinyl Record */}
+                      <div className="mt-1 relative flex items-center justify-center">
+                        <div className="w-9 h-9 rounded-full bg-neutral-900 border-2 border-neutral-700/80 shadow-lg flex items-center justify-center animate-spin" style={{ animationDuration: '4s' }}>
+                          <div className="w-4 h-4 rounded-full bg-neutral-950 border border-neutral-700 flex items-center justify-center overflow-hidden">
+                            {previewAccount.avatar ? (
+                              <img src={previewAccount.avatar} alt="sound" className="w-full h-full object-cover" />
+                            ) : (
+                              <TikTokIcon className="w-2.5 h-2.5 text-white" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom-Left Overlay: Creator Handle, Caption & Audio Ticker */}
+                    <div className="absolute left-0 right-14 bottom-0 p-3.5 pb-2 bg-gradient-to-t from-black/95 via-black/60 to-transparent z-10 text-left space-y-1.5">
+                      {/* Creator Handle */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-white tracking-wide hover:underline cursor-pointer">
+                          @{previewAccount.name ? previewAccount.name.replace(/^@/, '').toLowerCase().replace(/\s+/g, '_') : 'tiktok_creator'}
+                        </span>
+                        <BadgeCheck className="w-3.5 h-3.5 text-[#25F4EE] fill-[#25F4EE]/20 inline" />
+                      </div>
+
+                      {/* Post Caption */}
+                      <div className="text-xs text-white/95 leading-relaxed line-clamp-3 font-normal drop-shadow-sm">
+                        {renderFormattedTextWithMentions(
+                          previewData.content || 'Your TikTok caption and hashtags will appear here in real-time... #fyp #viral #trending',
+                          'TIKTOK'
+                        )}
+                      </div>
+
+                      {/* Sound Ticker */}
+                      <div className="flex items-center gap-1.5 text-[11px] text-white/80 pt-0.5">
+                        <Music className="w-3 h-3 text-[#25F4EE] flex-shrink-0 animate-bounce" />
+                        <span className="truncate max-w-[210px]">
+                          ♫ original sound - {previewAccount.name || 'Creator'} · Official Sound
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TikTok Mobile Bottom Nav Bar */}
+                  <div className="px-3 py-2 bg-black border-t border-neutral-900 flex items-center justify-between text-[10px] text-neutral-400 font-medium z-20 relative">
+                    <div className="flex flex-col items-center text-white cursor-pointer">
+                      <span className="font-bold">Home</span>
+                    </div>
+                    <div className="flex flex-col items-center hover:text-white cursor-pointer transition">
+                      <span>Friends</span>
+                    </div>
+                    {/* Iconic TikTok Center Plus Button */}
+                    <div className="relative cursor-pointer group hover:scale-105 transition">
+                      <div className="w-10 h-7 rounded-lg bg-white relative flex items-center justify-center">
+                        <span className="absolute -left-1 top-0 bottom-0 w-2 rounded-l-md bg-[#25F4EE]"></span>
+                        <span className="absolute -right-1 top-0 bottom-0 w-2 rounded-r-md bg-[#FE2C55]"></span>
+                        <Plus className="w-4 h-4 text-black stroke-[3] relative z-10" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center hover:text-white cursor-pointer transition relative">
+                      <span>Inbox</span>
+                      <span className="absolute -top-1 right-0 w-1.5 h-1.5 bg-[#FE2C55] rounded-full"></span>
+                    </div>
+                    <div className="flex flex-col items-center hover:text-white cursor-pointer transition">
+                      <span>Profile</span>
+                    </div>
+                  </div>
+
+                  {/* Auto First Comment Drawer / Pinned Comment */}
+                  {previewData.enableFirstComment && previewData.firstCommentContent.trim() && (
+                    <div className="p-3 bg-neutral-900/90 border-t border-neutral-800 text-xs">
+                      <div className="flex items-center justify-between text-[10px] text-neutral-400 mb-1.5">
+                        <span className="font-bold uppercase tracking-wider text-[#25F4EE] flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Auto First Comment ({previewData.firstCommentDelay === 0 ? 'Instant' : `+${previewData.firstCommentDelay}m`})
+                        </span>
+                        <span className="text-[9px] bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-300">Pinned</span>
+                      </div>
+                      <div className="flex items-start gap-2 bg-black/50 p-2 rounded-xl border border-neutral-800/80">
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-neutral-800 flex-shrink-0 mt-0.5">
+                          {previewAccount.avatar ? (
+                            <img src={previewAccount.avatar} alt={previewAccount.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-white bg-neutral-700">TT</div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px] font-bold text-white truncate">
+                              {previewAccount.name || 'creator'}
+                            </span>
+                            <span className="text-[9px] bg-[#FE2C55]/20 text-[#FE2C55] font-semibold px-1 rounded">Creator</span>
+                          </div>
+                          <div className="text-[11px] text-neutral-200 mt-0.5 leading-snug">
+                            {renderFormattedTextWithMentions(previewData.firstCommentContent, 'TIKTOK')}
                           </div>
                         </div>
                       </div>

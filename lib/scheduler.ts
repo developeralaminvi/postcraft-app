@@ -25,6 +25,11 @@ import {
   publishWordPressComment,
   getWordPressEngagement,
 } from './wordpress';
+import {
+  publishTikTokVideo,
+  publishTikTokComment,
+  getTikTokEngagement,
+} from './tiktok';
 
 /**
  * Process all scheduled posts that are due for publishing
@@ -100,6 +105,14 @@ export async function processDuePosts() {
           mediaUrl: post.mediaUrl || '',
           mediaType: (post.mediaType as any) || 'IMAGE',
         });
+      } else if (platform === 'TIKTOK') {
+        publishResult = await publishTikTokVideo({
+          openId: post.account.accountId,
+          accessToken: post.account.accessToken,
+          commentary: post.content,
+          videoUrl: post.mediaUrl,
+          mediaType: post.mediaType as any,
+        });
       } else {
         publishResult = await publishFacebookPost({
           pageId: post.account.accountId,
@@ -153,6 +166,12 @@ export async function processDuePosts() {
           } else if (platform === 'INSTAGRAM') {
             commentResult = await publishInstagramComment({
               mediaId: publishResult.postId,
+              accessToken: post.account.accessToken,
+              message: comment.content,
+            });
+          } else if (platform === 'TIKTOK') {
+            commentResult = await publishTikTokComment({
+              postId: publishResult.postId,
               accessToken: post.account.accessToken,
               message: comment.content,
             });
@@ -255,6 +274,12 @@ export async function processDueComments() {
           accessToken: parentPost.account.accessToken,
           message: comment.content,
         });
+      } else if (platform === 'TIKTOK') {
+        commentResult = await publishTikTokComment({
+          postId: parentPost.platformPostId,
+          accessToken: parentPost.account.accessToken,
+          message: comment.content,
+        });
       } else {
         commentResult = await publishFacebookComment({
           postId: parentPost.platformPostId,
@@ -354,6 +379,13 @@ export async function processMilestoneTriggers() {
         );
         reactionsCount = stats.reactionsCount;
         commentsCount = stats.commentsCount;
+      } else if (platform === 'TIKTOK') {
+        const stats = await getTikTokEngagement(
+          post.platformPostId,
+          post.account.accessToken
+        );
+        reactionsCount = stats.reactionsCount;
+        commentsCount = stats.commentsCount;
       } else {
         const stats = await getPostEngagement(
           post.platformPostId,
@@ -401,6 +433,12 @@ export async function processMilestoneTriggers() {
           } else if (platform === 'INSTAGRAM') {
             commentResult = await publishInstagramComment({
               mediaId: post.platformPostId,
+              accessToken: post.account.accessToken,
+              message: milestone.commentText,
+            });
+          } else if (platform === 'TIKTOK') {
+            commentResult = await publishTikTokComment({
+              postId: post.platformPostId,
               accessToken: post.account.accessToken,
               message: milestone.commentText,
             });

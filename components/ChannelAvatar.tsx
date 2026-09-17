@@ -2,11 +2,12 @@
 
 import React from 'react';
 import { Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
+import TikTokIcon from '@/components/icons/TikTokIcon';
 
 export interface ChannelAvatarProps {
   avatar?: string | null;
   name: string;
-  platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | string;
+  platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS' | 'TIKTOK' | string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showBadge?: boolean;
   className?: string;
@@ -59,6 +60,16 @@ export default function ChannelAvatar({
   const s = sizeMap[size] || sizeMap.md;
 
   const renderBadgeIcon = () => {
+    if (normPlatform === 'TIKTOK') {
+      return (
+        <span
+          className={`absolute ${s.badge} rounded-full bg-black text-white flex items-center justify-center border-white shadow-xs z-10 flex-shrink-0`}
+          title="TikTok"
+        >
+          <TikTokIcon className={s.badgeIcon} />
+        </span>
+      );
+    }
     if (normPlatform === 'WORDPRESS') {
       return (
         <span
@@ -117,7 +128,9 @@ export default function ChannelAvatar({
       ) : (
         <div
           className={`w-full h-full rounded-full flex items-center justify-center font-bold text-white shadow-2xs ${
-            normPlatform === 'WORDPRESS'
+            normPlatform === 'TIKTOK'
+              ? 'bg-black text-white ring-1 ring-slate-800'
+              : normPlatform === 'WORDPRESS'
               ? 'bg-[#21759B]'
               : normPlatform === 'LINKEDIN'
               ? 'bg-[#0A66C2]'

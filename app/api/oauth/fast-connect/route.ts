@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
 
     let effectiveAccountId = accountId?.trim();
     if (!effectiveAccountId) {
-      if (cleanPlatform === 'WORDPRESS') {
+      if (cleanPlatform === 'TIKTOK') {
+        effectiveAccountId = `open_${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, '') || randomSuffix}`;
+      } else if (cleanPlatform === 'WORDPRESS') {
         effectiveAccountId = `https://techcraft-demo.example.com`;
       } else if (cleanPlatform === 'LINKEDIN') {
         effectiveAccountId = `urn:li:person:${randomSuffix}`;
@@ -49,7 +51,9 @@ export async function POST(req: NextRequest) {
     // Default high-quality avatars if none provided
     let effectiveAvatar = avatar?.trim();
     if (!effectiveAvatar) {
-      if (cleanPlatform === 'WORDPRESS') {
+      if (cleanPlatform === 'TIKTOK') {
+        effectiveAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+      } else if (cleanPlatform === 'WORDPRESS') {
         effectiveAvatar = 'https://s.w.org/style/images/about/WordPress-logotype-wmark.png';
       } else if (cleanPlatform === 'LINKEDIN') {
         effectiveAvatar = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150';
@@ -76,7 +80,7 @@ export async function POST(req: NextRequest) {
       update: {
         name: cleanName,
         avatar: effectiveAvatar,
-        category: category || (cleanPlatform === 'WORDPRESS' ? 'WordPress Site / Blog' : cleanPlatform === 'LINKEDIN' ? 'LinkedIn Member Profile' : 'Facebook Page'),
+        category: category || (cleanPlatform === 'TIKTOK' ? 'TikTok Creator Profile' : cleanPlatform === 'WORDPRESS' ? 'WordPress Site / Blog' : cleanPlatform === 'LINKEDIN' ? 'LinkedIn Member Profile' : 'Facebook Page'),
         accessToken: autoToken,
         isActive: true,
       },
@@ -86,7 +90,7 @@ export async function POST(req: NextRequest) {
         accountId: effectiveAccountId,
         name: cleanName,
         avatar: effectiveAvatar,
-        category: category || (cleanPlatform === 'LINKEDIN' ? 'LinkedIn Member Profile' : 'Facebook Page'),
+        category: category || (cleanPlatform === 'TIKTOK' ? 'TikTok Creator Profile' : cleanPlatform === 'LINKEDIN' ? 'LinkedIn Member Profile' : 'Facebook Page'),
         accessToken: autoToken,
         isActive: true,
       },

@@ -5,6 +5,7 @@ import { publishFacebookPost, publishFacebookComment } from '@/lib/facebook';
 import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
 import { publishWordPressPost, publishWordPressComment } from '@/lib/wordpress';
+import { publishTikTokVideo, publishTikTokComment } from '@/lib/tiktok';
 
 export async function POST(
   req: NextRequest,
@@ -79,6 +80,14 @@ export async function POST(
         mediaUrl: post.mediaUrl || '',
         mediaType: (post.mediaType as any) || 'IMAGE',
       });
+    } else if (platform === 'TIKTOK') {
+      publishRes = await publishTikTokVideo({
+        openId: post.account.accountId,
+        accessToken: post.account.accessToken,
+        commentary: post.content,
+        videoUrl: post.mediaUrl,
+        mediaType: post.mediaType as any,
+      });
     } else {
       publishRes = await publishFacebookPost({
         pageId: post.account.accountId,
@@ -135,6 +144,12 @@ export async function POST(
         } else if (platform === 'INSTAGRAM') {
           commentRes = await publishInstagramComment({
             mediaId: publishRes.postId,
+            accessToken: post.account.accessToken,
+            message: comment.content,
+          });
+        } else if (platform === 'TIKTOK') {
+          commentRes = await publishTikTokComment({
+            postId: publishRes.postId,
             accessToken: post.account.accessToken,
             message: comment.content,
           });
