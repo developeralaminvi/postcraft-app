@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ChannelAvatar from '@/components/ChannelAvatar';
 import TikTokIcon from '@/components/icons/TikTokIcon';
+import XIcon from '@/components/icons/XIcon';
 import {
   Send,
   Calendar,
@@ -36,6 +37,7 @@ import {
   BadgeCheck,
   UserPlus,
   RotateCcw,
+  Repeat,
   Check,
   Layers,
   Edit3,
@@ -977,7 +979,7 @@ export default function CreatePostPage() {
 
   const renderFormattedTextWithMentions = (
     text: string,
-    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'TIKTOK' = 'FACEBOOK'
+    platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'TIKTOK' | 'TWITTER' = 'FACEBOOK'
   ) => {
     if (!text) return null;
     const parts = text.split(/(@[a-zA-Z0-9_\.]+|#[a-zA-Z0-9_\.]+|{[a-zA-Z0-9_]+})/g);
@@ -999,6 +1001,8 @@ export default function CreatePostPage() {
             className={`font-semibold cursor-pointer transition ${
               platform === 'TIKTOK'
                 ? 'font-bold text-white hover:text-[#25F4EE] drop-shadow-xs'
+                : platform === 'TWITTER'
+                ? 'text-[#1D9BF0] hover:underline font-normal'
                 : 'text-indigo-600 hover:text-indigo-700 hover:underline'
             }`}
           >
@@ -1013,8 +1017,8 @@ export default function CreatePostPage() {
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               setHoveredProfileData({
-                profile: findProfileByTag(part, platform === 'TIKTOK' ? 'INSTAGRAM' : platform),
-                platform,
+                profile: findProfileByTag(part, platform === 'TIKTOK' ? 'INSTAGRAM' : platform === 'TWITTER' ? 'LINKEDIN' : platform),
+                platform: platform === 'TWITTER' ? 'LINKEDIN' : platform,
                 rect: { top: rect.top, left: rect.left },
               });
             }}
@@ -1022,6 +1026,8 @@ export default function CreatePostPage() {
             className={`font-semibold cursor-pointer transition inline-block ${
               platform === 'TIKTOK'
                 ? 'text-white font-bold hover:text-[#25F4EE] drop-shadow-xs'
+                : platform === 'TWITTER'
+                ? 'text-[#1D9BF0] hover:underline'
                 : platform === 'LINKEDIN'
                 ? 'text-[#0A66C2] hover:text-[#004182] bg-blue-50/70 hover:bg-blue-100 px-1 py-0.2 rounded'
                 : platform === 'INSTAGRAM'
@@ -1559,6 +1565,7 @@ export default function CreatePostPage() {
   const isPreviewLinkedIn = !isPreviewWordPress && previewPlatform === 'LINKEDIN';
   const isPreviewInstagram = !isPreviewWordPress && previewPlatform === 'INSTAGRAM';
   const isPreviewTikTok = !isPreviewWordPress && previewPlatform === 'TIKTOK';
+  const isPreviewTwitter = !isPreviewWordPress && (previewPlatform === 'TWITTER' || previewPlatform === 'X');
 
   return (
     <div className="space-y-8 max-w-6xl">
@@ -2684,7 +2691,24 @@ export default function CreatePostPage() {
                     <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
                       {isMaster ? 'Master Post Caption' : `${activeAccount?.name} Caption`}
                     </label>
-                    <span className="text-xs text-slate-400">{currentContent.length} characters</span>
+                    <div className="flex items-center gap-2">
+                      {((!isMaster && (activeAccount?.platform === 'TWITTER' || activeAccount?.platform === 'X')) ||
+                        (isMaster && socialAccounts.some((a) => (a.platform === 'TWITTER' || a.platform === 'X') && selectedAccountIds.includes(a.id)))) && (
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                            currentContent.length > 280
+                              ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                              : currentContent.length > 250
+                              ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          <XIcon className="w-2.5 h-2.5" />
+                          {280 - currentContent.length} left
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400">{currentContent.length} characters</span>
+                    </div>
                   </div>
 
                   {/* Quick Mention Toolbar for Social Channels */}
@@ -3331,6 +3355,8 @@ export default function CreatePostPage() {
                   ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
                   : isPreviewTikTok
                   ? 'bg-black text-white ring-1 ring-slate-800'
+                  : isPreviewTwitter
+                  ? 'bg-black text-white ring-1 ring-slate-800'
                   : 'bg-blue-600 text-white'
               }`}
             >
@@ -3342,6 +3368,8 @@ export default function CreatePostPage() {
                 ? 'Instagram Mobile Feed'
                 : isPreviewTikTok
                 ? 'TikTok Mobile Feed'
+                : isPreviewTwitter
+                ? 'X Desktop Feed'
                 : 'Facebook Desktop'}
             </span>
           </div>
@@ -3930,6 +3958,170 @@ export default function CreatePostPage() {
                           </div>
                           <div className="text-[11px] text-neutral-200 mt-0.5 leading-snug">
                             {renderFormattedTextWithMentions(previewData.firstCommentContent, 'TIKTOK')}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : isPreviewTwitter ? (
+                /* AUTHENTIC X (TWITTER) POST CARD MOCKUP */
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden text-slate-900 animate-in fade-in">
+                  <div className="p-4 space-y-3">
+                    {/* Top User Row */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-black flex-shrink-0">
+                          {previewAccount.avatar ? (
+                            <img
+                              src={previewAccount.avatar}
+                              alt={previewAccount.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white text-xs font-bold bg-neutral-900">
+                              <XIcon className="w-4 h-4 text-white" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0 leading-tight">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-sm text-slate-900 truncate">
+                              {previewAccount.name || 'TechCraft'}
+                            </span>
+                            {/* Blue Verified Checkmark */}
+                            <svg className="w-4 h-4 text-[#1D9BF0] flex-shrink-0 fill-current" viewBox="0 0 22 22">
+                              <path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.136 2.136 5.48-5.48 1.294 1.302-6.774 6.772z" />
+                            </svg>
+                            <span className="text-xs text-slate-500 font-normal truncate">
+                              @{previewAccount.accountId?.replace(/^@/, '') || previewAccount.name?.toLowerCase().replace(/[\s@]+/g, '_') || 'postcraft'}
+                            </span>
+                            <span className="text-xs text-slate-400">·</span>
+                            <span className="text-xs text-slate-400">Just now</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* X Brand Icon top-right */}
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-slate-800 hover:bg-slate-100 transition cursor-pointer">
+                        <XIcon className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+
+                    {/* Tweet Content */}
+                    <div className="text-sm text-slate-900 whitespace-pre-wrap leading-relaxed">
+                      {renderFormattedTextWithMentions(
+                        previewData.content || 'What is happening?! Write your post to preview here in real time...',
+                        'TWITTER'
+                      )}
+                    </div>
+
+                    {/* Tweet Media Attachment */}
+                    {previewData.mediaUrl && (
+                      <div className="w-full rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-950 flex items-center justify-center max-h-80">
+                        {previewData.mediaType === 'VIDEO' ? (
+                          <video
+                            src={previewData.mediaUrl}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="w-full max-h-80 object-cover bg-black"
+                          />
+                        ) : (
+                          <img
+                            src={previewData.mediaUrl}
+                            alt="Tweet Attachment"
+                            className="w-full object-cover max-h-80"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tweet Timestamp & Post Views */}
+                    <div className="pt-2 text-xs text-slate-500 flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                      <span>{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>·</span>
+                      <span>{new Date().toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span>·</span>
+                      <span className="font-bold text-slate-700">1.2K</span>
+                      <span>Views</span>
+                    </div>
+
+                    {/* Authentic X 5-Icon Action Bar */}
+                    <div className="flex items-center justify-between text-slate-500 px-1 pt-1 text-xs select-none">
+                      {/* Reply */}
+                      <div className="flex items-center gap-1.5 hover:text-[#1D9BF0] cursor-pointer transition group">
+                        <div className="p-1.5 rounded-full group-hover:bg-[#1D9BF0]/10">
+                          <MessageCircle className="w-4 h-4" />
+                        </div>
+                        <span className="text-[11px]">24</span>
+                      </div>
+
+                      {/* Repost */}
+                      <div className="flex items-center gap-1.5 hover:text-[#00BA7C] cursor-pointer transition group">
+                        <div className="p-1.5 rounded-full group-hover:bg-[#00BA7C]/10">
+                          <Repeat className="w-4 h-4" />
+                        </div>
+                        <span className="text-[11px]">18</span>
+                      </div>
+
+                      {/* Like */}
+                      <div className="flex items-center gap-1.5 hover:text-[#F91880] cursor-pointer transition group">
+                        <div className="p-1.5 rounded-full group-hover:bg-[#F91880]/10">
+                          <Heart className="w-4 h-4" />
+                        </div>
+                        <span className="text-[11px]">142</span>
+                      </div>
+
+                      {/* Bookmark */}
+                      <div className="flex items-center gap-1.5 hover:text-[#1D9BF0] cursor-pointer transition group">
+                        <div className="p-1.5 rounded-full group-hover:bg-[#1D9BF0]/10">
+                          <Bookmark className="w-4 h-4" />
+                        </div>
+                        <span className="text-[11px]">36</span>
+                      </div>
+
+                      {/* Share */}
+                      <div className="flex items-center hover:text-[#1D9BF0] cursor-pointer transition group">
+                        <div className="p-1.5 rounded-full group-hover:bg-[#1D9BF0]/10">
+                          <Share2 className="w-4 h-4" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Threaded First Reply */}
+                  {previewData.enableFirstComment && previewData.firstCommentContent.trim() && (
+                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 text-xs">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
+                        <span className="font-bold uppercase tracking-wider text-[#1D9BF0] flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Auto First Reply ({previewData.firstCommentDelay === 0 ? 'Instant' : `+${previewData.firstCommentDelay}m`})
+                        </span>
+                        <span className="text-[9px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-medium">Threaded Reply</span>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 relative">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-black flex-shrink-0 flex items-center justify-center text-white text-[10px] font-bold">
+                          {previewAccount.avatar ? (
+                            <img src={previewAccount.avatar} alt={previewAccount.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <XIcon className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-xs text-slate-900 truncate">
+                              {previewAccount.name || 'TechCraft'}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              @{previewAccount.accountId?.replace(/^@/, '') || previewAccount.name?.toLowerCase().replace(/[\s@]+/g, '_') || 'postcraft'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 mb-1">
+                            Replying to <span className="text-[#1D9BF0]">@{previewAccount.accountId?.replace(/^@/, '') || 'postcraft'}</span>
+                          </p>
+                          <div className="text-xs text-slate-800 leading-snug whitespace-pre-wrap">
+                            {renderFormattedTextWithMentions(previewData.firstCommentContent, 'TWITTER')}
                           </div>
                         </div>
                       </div>

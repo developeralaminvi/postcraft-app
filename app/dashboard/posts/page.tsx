@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import TikTokIcon from '@/components/icons/TikTokIcon';
+import XIcon from '@/components/icons/XIcon';
 import {
   Calendar,
   Clock,
@@ -246,7 +247,7 @@ export default function PostsPage() {
                           ? 'bg-[#0A66C2]'
                           : post.account.platform === 'INSTAGRAM'
                           ? 'bg-gradient-to-tr from-amber-500 via-pink-600 to-purple-600'
-                          : post.account.platform === 'TIKTOK'
+                          : post.account.platform === 'TIKTOK' || post.account.platform === 'TWITTER' || post.account.platform === 'X'
                           ? 'bg-black'
                           : 'bg-blue-600'
                       }`}
@@ -265,6 +266,8 @@ export default function PostsPage() {
                         <Instagram className="w-5 h-5" />
                       ) : post.account.platform === 'TIKTOK' ? (
                         <TikTokIcon className="w-5 h-5 text-white" />
+                      ) : (post.account.platform === 'TWITTER' || post.account.platform === 'X') ? (
+                        <XIcon className="w-4 h-4 text-white" />
                       ) : (
                         post.account.name.slice(0, 2).toUpperCase()
                       )}
@@ -282,7 +285,7 @@ export default function PostsPage() {
                               ? 'bg-blue-50 text-[#0A66C2] border-blue-200'
                               : post.account.platform === 'INSTAGRAM'
                               ? 'bg-pink-50 text-pink-700 border-pink-200'
-                              : post.account.platform === 'TIKTOK'
+                              : post.account.platform === 'TIKTOK' || post.account.platform === 'TWITTER' || post.account.platform === 'X'
                               ? 'bg-neutral-900 text-white border-neutral-800'
                               : 'bg-blue-50 text-blue-700 border-blue-200'
                           }`}
@@ -343,6 +346,8 @@ export default function PostsPage() {
                             ? 'Instagram'
                             : post.account.platform === 'TIKTOK'
                             ? 'TikTok'
+                            : (post.account.platform === 'TWITTER' || post.account.platform === 'X')
+                            ? 'X'
                             : 'Facebook'
                         }
                       </a>

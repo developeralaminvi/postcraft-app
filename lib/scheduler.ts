@@ -30,6 +30,11 @@ import {
   publishTikTokComment,
   getTikTokEngagement,
 } from './tiktok';
+import {
+  publishTwitterTweet,
+  publishTwitterReply,
+  getTwitterEngagement,
+} from './twitter';
 
 /**
  * Process all scheduled posts that are due for publishing
@@ -113,6 +118,13 @@ export async function processDuePosts() {
           videoUrl: post.mediaUrl,
           mediaType: post.mediaType as any,
         });
+      } else if (platform === 'TWITTER' || platform === 'X') {
+        publishResult = await publishTwitterTweet({
+          text: post.content,
+          mediaUrl: post.mediaUrl,
+          accessToken: post.account.accessToken,
+          username: post.account.name,
+        });
       } else {
         publishResult = await publishFacebookPost({
           pageId: post.account.accountId,
@@ -174,6 +186,12 @@ export async function processDuePosts() {
               postId: publishResult.postId,
               accessToken: post.account.accessToken,
               message: comment.content,
+            });
+          } else if (platform === 'TWITTER' || platform === 'X') {
+            commentResult = await publishTwitterReply({
+              tweetId: publishResult.postId,
+              accessToken: post.account.accessToken,
+              text: comment.content,
             });
           } else {
             commentResult = await publishFacebookComment({
@@ -279,6 +297,12 @@ export async function processDueComments() {
           postId: parentPost.platformPostId,
           accessToken: parentPost.account.accessToken,
           message: comment.content,
+        });
+      } else if (platform === 'TWITTER' || platform === 'X') {
+        commentResult = await publishTwitterReply({
+          tweetId: parentPost.platformPostId,
+          accessToken: parentPost.account.accessToken,
+          text: comment.content,
         });
       } else {
         commentResult = await publishFacebookComment({
@@ -386,6 +410,13 @@ export async function processMilestoneTriggers() {
         );
         reactionsCount = stats.reactionsCount;
         commentsCount = stats.commentsCount;
+      } else if (platform === 'TWITTER' || platform === 'X') {
+        const stats = await getTwitterEngagement(
+          post.platformPostId,
+          post.account.accessToken
+        );
+        reactionsCount = stats.reactionsCount;
+        commentsCount = stats.commentsCount;
       } else {
         const stats = await getPostEngagement(
           post.platformPostId,
@@ -441,6 +472,12 @@ export async function processMilestoneTriggers() {
               postId: post.platformPostId,
               accessToken: post.account.accessToken,
               message: milestone.commentText,
+            });
+          } else if (platform === 'TWITTER' || platform === 'X') {
+            commentResult = await publishTwitterReply({
+              tweetId: post.platformPostId,
+              accessToken: post.account.accessToken,
+              text: milestone.commentText,
             });
           } else {
             commentResult = await publishFacebookComment({

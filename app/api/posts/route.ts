@@ -6,6 +6,7 @@ import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
 import { publishWordPressPost, publishWordPressComment } from '@/lib/wordpress';
 import { publishTikTokVideo, publishTikTokComment } from '@/lib/tiktok';
+import { publishTwitterTweet, publishTwitterReply } from '@/lib/twitter';
 import { processDuePosts } from '@/lib/scheduler';
 
 export async function GET() {
@@ -195,6 +196,13 @@ export async function POST(req: NextRequest) {
               videoUrl: effectiveMediaUrl,
               mediaType: effectiveMediaType as any,
             });
+          } else if (account.platform === 'TWITTER' || account.platform === 'X') {
+            publishRes = await publishTwitterTweet({
+              accessToken: account.accessToken,
+              text: effectiveContent,
+              mediaUrl: effectiveMediaUrl,
+              mediaType: effectiveMediaType as any,
+            });
           } else {
             publishRes = await publishFacebookPost({
               pageId: account.accountId,
@@ -278,6 +286,12 @@ export async function POST(req: NextRequest) {
                   postId: publishedPostId,
                   accessToken: account.accessToken,
                   message: effectiveAutoComment.content.trim(),
+                });
+              } else if (account.platform === 'TWITTER' || account.platform === 'X') {
+                commentRes = await publishTwitterReply({
+                  tweetId: publishedPostId,
+                  accessToken: account.accessToken,
+                  content: effectiveAutoComment.content.trim(),
                 });
               } else {
                 commentRes = await publishFacebookComment({

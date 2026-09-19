@@ -6,6 +6,7 @@ import { verifyInstagramAccount } from '@/lib/instagram';
 import { verifyLinkedInAccount } from '@/lib/linkedin';
 import { verifyWordPressAccount } from '@/lib/wordpress';
 import { verifyTikTokAccount } from '@/lib/tiktok';
+import { verifyTwitterAccount } from '@/lib/twitter';
 
 export async function GET() {
   try {
@@ -143,6 +144,21 @@ export async function POST(req: NextRequest) {
         name: verification.data.name,
         avatar: verification.data.avatar,
         category: verification.data.category || 'TikTok Creator Profile',
+        token: verification.data.accessToken,
+      };
+    } else if (platform === 'TWITTER' || platform === 'X') {
+      const verification = await verifyTwitterAccount(pageId.trim(), accessToken.trim());
+      if (!verification.success || !verification.data) {
+        return NextResponse.json(
+          { error: verification.error || 'Invalid X (Twitter) credentials' },
+          { status: 400 }
+        );
+      }
+      accountData = {
+        id: verification.data.id,
+        name: verification.data.name,
+        avatar: verification.data.avatar,
+        category: verification.data.category || 'X (Twitter) Profile',
         token: verification.data.accessToken,
       };
     } else {

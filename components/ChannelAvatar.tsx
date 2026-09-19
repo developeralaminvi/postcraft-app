@@ -3,11 +3,12 @@
 import React from 'react';
 import { Facebook, Instagram, Linkedin, Globe } from 'lucide-react';
 import TikTokIcon from '@/components/icons/TikTokIcon';
+import XIcon from '@/components/icons/XIcon';
 
 export interface ChannelAvatarProps {
   avatar?: string | null;
   name: string;
-  platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS' | 'TIKTOK' | string;
+  platform: 'FACEBOOK' | 'INSTAGRAM' | 'LINKEDIN' | 'WORDPRESS' | 'TIKTOK' | 'TWITTER' | 'X' | string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   showBadge?: boolean;
   className?: string;
@@ -100,6 +101,16 @@ export default function ChannelAvatar({
         </span>
       );
     }
+    if (normPlatform === 'TWITTER' || normPlatform === 'X') {
+      return (
+        <span
+          className={`absolute ${s.badge} rounded-full bg-black text-white flex items-center justify-center border-white shadow-xs z-10 flex-shrink-0`}
+          title="X (Twitter)"
+        >
+          <XIcon className={s.badgeIcon} />
+        </span>
+      );
+    }
     // Default Facebook
     return (
       <span
@@ -128,7 +139,7 @@ export default function ChannelAvatar({
       ) : (
         <div
           className={`w-full h-full rounded-full flex items-center justify-center font-bold text-white shadow-2xs ${
-            normPlatform === 'TIKTOK'
+            normPlatform === 'TIKTOK' || normPlatform === 'TWITTER' || normPlatform === 'X'
               ? 'bg-black text-white ring-1 ring-slate-800'
               : normPlatform === 'WORDPRESS'
               ? 'bg-[#21759B]'

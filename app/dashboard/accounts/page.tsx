@@ -51,7 +51,7 @@ interface Account {
   _count?: { posts: number };
 }
 
-type PlatformType = 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK' | 'LINKEDIN' | 'WORDPRESS';
+type PlatformType = 'FACEBOOK' | 'INSTAGRAM' | 'TIKTOK' | 'TWITTER' | 'LINKEDIN' | 'WORDPRESS';
 
 interface PlatformMeta {
   id: PlatformType;
@@ -92,6 +92,15 @@ const SUPPORTED_PLATFORMS: PlatformMeta[] = [
     description: 'Connect TikTok Creator accounts to schedule 9:16 vertical videos, sound tracks, and milestone replies.',
   },
   {
+    id: 'TWITTER',
+    name: 'X (Twitter)',
+    subtitle: 'Tweets & Threads',
+    badgeColor: 'bg-black',
+    activeBorder: 'border-black ring-2 ring-slate-900/30',
+    icon: XTwitterBrandIcon,
+    description: 'Connect X (Twitter) accounts to publish tweets, photos, videos, and threaded replies with real-time live preview.',
+  },
+  {
     id: 'LINKEDIN',
     name: 'LinkedIn',
     subtitle: 'Company & Profile',
@@ -117,12 +126,6 @@ const UPCOMING_PLATFORMS = [
     name: 'YouTube',
     subtitle: 'Shorts & Videos',
     icon: YouTubeBrandIcon,
-  },
-  {
-    id: 'X_TWITTER',
-    name: 'X (Twitter)',
-    subtitle: 'Tweets & Threads',
-    icon: XTwitterBrandIcon,
   },
   {
     id: 'PINTEREST',
@@ -183,6 +186,7 @@ export default function AccountsPage() {
       FACEBOOK: 'TechCraft Facebook Page',
       INSTAGRAM: 'TechCraft Instagram Business',
       TIKTOK: 'TechCraft TikTok Creator',
+      TWITTER: 'TechCraft on X (@techcraft)',
       LINKEDIN: 'Alamin LinkedIn Profile',
       WORDPRESS: 'TechCraft WordPress Site',
     };
@@ -273,6 +277,9 @@ export default function AccountsPage() {
     if (platform === 'TIKTOK') {
       setPageId(`open_creator_${randomId}`);
       setAccessToken('AUTOCONNECT_TIKTOK_TOKEN_SIMULATED');
+    } else if (platform === 'TWITTER') {
+      setPageId('@techcraft_x');
+      setAccessToken('TEST_X_TWITTER_BEARER_TOKEN_12345');
     } else if (platform === 'WORDPRESS') {
       setPageId('https://techcraft.example.com');
       setWpUsername('demouser');
@@ -372,7 +379,7 @@ export default function AccountsPage() {
         </div>
 
         {/* Supported Platforms Grid with Real Brand Logos */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
           {SUPPORTED_PLATFORMS.map((p) => {
             const isSelected = platform === p.id;
             const connectedCount = accounts.filter((a) => a.platform.toUpperCase() === p.id).length;
@@ -443,7 +450,7 @@ export default function AccountsPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {UPCOMING_PLATFORMS.map((up) => {
               const UpIcon = up.icon;
               return (
@@ -554,6 +561,8 @@ export default function AccountsPage() {
                   ? 'WordPress Site URL'
                   : platform === 'TIKTOK'
                   ? 'TikTok OpenID or Handle'
+                  : platform === 'TWITTER'
+                  ? 'X (Twitter) Handle or User ID'
                   : platform === 'LINKEDIN'
                   ? 'LinkedIn Member URN or Org ID'
                   : platform === 'INSTAGRAM'
@@ -570,6 +579,8 @@ export default function AccountsPage() {
                     ? 'https://yourwebsite.com'
                     : platform === 'TIKTOK'
                     ? 'e.g. open_12345678 or @alamin_tech'
+                    : platform === 'TWITTER'
+                    ? 'e.g. @your_handle or 189201928'
                     : platform === 'LINKEDIN'
                     ? 'urn:li:person:... or urn:li:organization:... (or "me")'
                     : platform === 'INSTAGRAM'
@@ -583,6 +594,8 @@ export default function AccountsPage() {
                   ? 'Enter full URL of your WordPress website (e.g. https://yourwebsite.com)'
                   : platform === 'TIKTOK'
                   ? 'Enter your TikTok Creator OpenID or username handle (e.g. @your_creator_name)'
+                  : platform === 'TWITTER'
+                  ? 'Enter your X (Twitter) username handle (e.g. @techcraft) or numerical user ID'
                   : platform === 'LINKEDIN'
                   ? 'For company pages, enter company page numerical ID or URL. For personal profile, write "me".'
                   : platform === 'INSTAGRAM'
@@ -617,6 +630,8 @@ export default function AccountsPage() {
                   ? 'Application Password'
                   : platform === 'TIKTOK'
                   ? 'TikTok Creator Access Token'
+                  : platform === 'TWITTER'
+                  ? 'X API Bearer Token / OAuth 2.0 User Token'
                   : 'Access Token'}
               </label>
               <textarea
@@ -629,6 +644,8 @@ export default function AccountsPage() {
                     ? 'xxxx xxxx xxxx xxxx (Application Password)'
                     : platform === 'TIKTOK'
                     ? 'act.example.tiktok.oauth.token...'
+                    : platform === 'TWITTER'
+                    ? 'AAAAAAAAAAAAAAAAAAAAA... (X Bearer Token or OAuth 2.0 Token)'
                     : platform === 'LINKEDIN'
                     ? 'AQ... (LinkedIn OAuth 2.0 Access Token)'
                     : platform === 'INSTAGRAM'
@@ -648,7 +665,7 @@ export default function AccountsPage() {
               type="submit"
               disabled={submitting}
               className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white text-sm font-semibold shadow-sm transition disabled:opacity-50 cursor-pointer ${
-                platform === 'TIKTOK'
+                platform === 'TIKTOK' || platform === 'TWITTER'
                   ? 'bg-black hover:bg-slate-900 ring-1 ring-slate-800'
                   : platform === 'WORDPRESS'
                   ? 'bg-[#21759B] hover:bg-[#1a5d7c]'
@@ -789,6 +806,8 @@ export default function AccountsPage() {
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                               acc.platform === 'TIKTOK'
                                 ? 'bg-black text-white border-slate-800'
+                                : acc.platform === 'TWITTER' || acc.platform === 'X'
+                                ? 'bg-black text-white border-slate-800'
                                 : acc.platform === 'WORDPRESS'
                                 ? 'bg-blue-50 text-[#21759B] border-blue-200'
                                 : acc.platform === 'LINKEDIN'
@@ -802,6 +821,8 @@ export default function AccountsPage() {
                           >
                             {acc.platform === 'TIKTOK'
                               ? '🎵 TikTok Creator'
+                              : acc.platform === 'TWITTER' || acc.platform === 'X'
+                              ? '𝕏 X (Twitter)'
                               : acc.platform === 'WORDPRESS'
                               ? '🌐 WordPress Site'
                               : acc.platform === 'LINKEDIN'
@@ -1021,6 +1042,43 @@ export default function AccountsPage() {
                       <li>Request scopes: <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">user.info.basic</code>, <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">video.publish</code>, and <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">video.upload</code>.</li>
                       <li>Complete TikTok Creator OAuth authorization to receive your <code className="font-mono text-black font-bold">open_id</code> and <code className="font-mono text-black font-bold">access_token</code>.</li>
                       <li>Paste them into PostCraft to activate instant vertical video publishing!</li>
+                    </ol>
+                  </div>
+                </div>
+              )}
+
+              {guidePlatform === 'TWITTER' && (
+                <div className="space-y-4">
+                  <div className="p-3.5 rounded-2xl bg-black text-white border border-slate-800 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-white text-sm flex items-center gap-1.5">
+                        <XTwitterBrandIcon className="w-4 h-4 text-white" /> X Developer Portal (developer.x.com)
+                      </p>
+                      <p className="text-slate-300 text-xs mt-0.5">
+                        Create an app at developer.x.com to obtain OAuth 2.0 or Bearer Token with tweet.write permissions.
+                      </p>
+                    </div>
+                    <a
+                      href="https://developer.x.com/en/portal/dashboard"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-white text-black hover:bg-slate-100 font-bold flex items-center gap-1 text-xs flex-shrink-0 shadow-2xs"
+                    >
+                      X Portal <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-slate-200 space-y-2">
+                    <p className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-black"></span>
+                      How to get your X (Twitter) API Token:
+                    </p>
+                    <ol className="list-decimal pl-5 space-y-1.5 text-slate-600">
+                      <li>Visit <strong>developer.x.com/en/portal/dashboard</strong> and create a Project & App.</li>
+                      <li>Under App Settings &gt; <strong>User authentication settings</strong>, enable OAuth 2.0.</li>
+                      <li>Enable <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">tweet.read</code>, <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">tweet.write</code>, and <code className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-mono">users.read</code> scopes.</li>
+                      <li>Generate a <strong>Bearer Token</strong> or User Access Token.</li>
+                      <li>Enter your X username handle (e.g. <code className="px-1.5 py-0.5 bg-slate-100 text-black font-bold font-mono">@techcraft</code>) in the ID box and paste your token into PostCraft!</li>
                     </ol>
                   </div>
                 </div>

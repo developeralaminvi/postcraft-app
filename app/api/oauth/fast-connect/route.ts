@@ -37,6 +37,8 @@ export async function POST(req: NextRequest) {
     if (!effectiveAccountId) {
       if (cleanPlatform === 'TIKTOK') {
         effectiveAccountId = `open_${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, '') || randomSuffix}`;
+      } else if (cleanPlatform === 'TWITTER' || cleanPlatform === 'X') {
+        effectiveAccountId = cleanName.startsWith('@') ? cleanName : `@${cleanName.toLowerCase().replace(/[^a-z0-9_]/g, '') || 'user'}`;
       } else if (cleanPlatform === 'WORDPRESS') {
         effectiveAccountId = `https://techcraft-demo.example.com`;
       } else if (cleanPlatform === 'LINKEDIN') {
@@ -53,6 +55,8 @@ export async function POST(req: NextRequest) {
     if (!effectiveAvatar) {
       if (cleanPlatform === 'TIKTOK') {
         effectiveAvatar = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150';
+      } else if (cleanPlatform === 'TWITTER' || cleanPlatform === 'X') {
+        effectiveAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
       } else if (cleanPlatform === 'WORDPRESS') {
         effectiveAvatar = 'https://s.w.org/style/images/about/WordPress-logotype-wmark.png';
       } else if (cleanPlatform === 'LINKEDIN') {

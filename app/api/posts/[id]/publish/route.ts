@@ -6,6 +6,7 @@ import { publishInstagramPost, publishInstagramComment } from '@/lib/instagram';
 import { publishLinkedInPost, publishLinkedInComment } from '@/lib/linkedin';
 import { publishWordPressPost, publishWordPressComment } from '@/lib/wordpress';
 import { publishTikTokVideo, publishTikTokComment } from '@/lib/tiktok';
+import { publishTwitterTweet, publishTwitterReply } from '@/lib/twitter';
 
 export async function POST(
   req: NextRequest,
@@ -88,6 +89,13 @@ export async function POST(
         videoUrl: post.mediaUrl,
         mediaType: post.mediaType as any,
       });
+    } else if (platform === 'TWITTER' || platform === 'X') {
+      publishRes = await publishTwitterTweet({
+        text: post.content,
+        mediaUrl: post.mediaUrl,
+        accessToken: post.account.accessToken,
+        username: post.account.name,
+      });
     } else {
       publishRes = await publishFacebookPost({
         pageId: post.account.accountId,
@@ -152,6 +160,12 @@ export async function POST(
             postId: publishRes.postId,
             accessToken: post.account.accessToken,
             message: comment.content,
+          });
+        } else if (platform === 'TWITTER' || platform === 'X') {
+          commentRes = await publishTwitterReply({
+            tweetId: publishRes.postId,
+            accessToken: post.account.accessToken,
+            text: comment.content,
           });
         } else {
           commentRes = await publishFacebookComment({

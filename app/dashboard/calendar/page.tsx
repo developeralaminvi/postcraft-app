@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import TikTokIcon from '@/components/icons/TikTokIcon';
+import XIcon from '@/components/icons/XIcon';
 import {
   ChevronLeft,
   ChevronRight,
@@ -754,6 +755,10 @@ export default function CalendarPage() {
                               <span className="p-0.5 rounded bg-black text-white inline-flex items-center justify-center">
                                 <TikTokIcon className="w-2.5 h-2.5" />
                               </span>
+                            ) : (post.account?.platform === 'TWITTER' || post.account?.platform === 'X') ? (
+                              <span className="p-0.5 rounded bg-black text-white inline-flex items-center justify-center">
+                                <XIcon className="w-2.5 h-2.5" />
+                              </span>
                             ) : (
                               <span className="p-0.5 rounded bg-[#1877F2] text-white inline-flex items-center justify-center">
                                 <Facebook className="w-2.5 h-2.5" />
@@ -889,6 +894,10 @@ export default function CalendarPage() {
                         <span className="p-1 rounded bg-black text-white">
                           <TikTokIcon className="w-3 h-3" />
                         </span>
+                      ) : (post.account?.platform === 'TWITTER' || post.account?.platform === 'X') ? (
+                        <span className="p-1 rounded bg-black text-white">
+                          <XIcon className="w-3 h-3" />
+                        </span>
                       ) : (
                         <span className="p-1 rounded bg-[#1877F2] text-white">
                           <Facebook className="w-3 h-3" />
@@ -957,6 +966,10 @@ export default function CalendarPage() {
                 ) : selectedPost.account?.platform === 'TIKTOK' ? (
                   <span className="p-1 rounded-lg bg-black text-white flex items-center justify-center">
                     <TikTokIcon className="w-3.5 h-3.5" />
+                  </span>
+                ) : (selectedPost.account?.platform === 'TWITTER' || selectedPost.account?.platform === 'X') ? (
+                  <span className="p-1 rounded-lg bg-black text-white flex items-center justify-center">
+                    <XIcon className="w-3.5 h-3.5" />
                   </span>
                 ) : (
                   <span className="p-1 rounded-lg bg-[#1877F2] text-white flex items-center justify-center">
@@ -1249,6 +1262,8 @@ export default function CalendarPage() {
                       ? 'bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 hover:opacity-90'
                       : selectedPost.account?.platform === 'TIKTOK'
                       ? 'bg-black hover:bg-neutral-900 border border-neutral-800'
+                      : (selectedPost.account?.platform === 'TWITTER' || selectedPost.account?.platform === 'X')
+                      ? 'bg-black hover:bg-neutral-900 border border-neutral-800'
                       : 'bg-[#1877F2] hover:bg-blue-700'
                   }`}
                 >
@@ -1260,6 +1275,8 @@ export default function CalendarPage() {
                     ? 'View Live on Instagram'
                     : selectedPost.account?.platform === 'TIKTOK'
                     ? 'View Live on TikTok'
+                    : (selectedPost.account?.platform === 'TWITTER' || selectedPost.account?.platform === 'X')
+                    ? 'View Live on X'
                     : 'View Live on Facebook'}{' '}
                   <ExternalLink className="w-3.5 h-3.5" />
                 </a>
